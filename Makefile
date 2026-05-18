@@ -17,12 +17,12 @@ install:
 	pre-commit install
 
 fmt:
-	ruff format src tests scripts
-	ruff check --fix src tests scripts
+	ruff format src tests $$(test -d scripts && echo scripts)
+	ruff check --fix src tests $$(test -d scripts && echo scripts)
 
 lint:
-	ruff format --check src tests scripts
-	ruff check src tests scripts
+	ruff format --check src tests $$(test -d scripts && echo scripts)
+	ruff check src tests $$(test -d scripts && echo scripts)
 
 typecheck:
 	mypy src/talonic
