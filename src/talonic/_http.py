@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json as _json_module
 import random
 import time
 from json import JSONDecodeError
@@ -127,13 +128,24 @@ class SyncTransport(BaseTransport):
         files: dict[str, Any] | None = None,
         data: dict[str, Any] | None = None,
     ) -> WithRateLimit[Any]:
-        json_body = json  # avoid shadowing the `json` stdlib module below
+        # Serialize JSON manually so we control formatting (spaces after separators).
+        content: bytes | None = None
+        extra_headers: dict[str, str] = {}
+        if json is not None:
+            content = _json_module.dumps(json).encode()
+            extra_headers["Content-Type"] = "application/json"
         attempt = 0
         last_exc: TalonicError | None = None
         while True:
             try:
                 response = self._client.request(
-                    method, path, params=params, json=json_body, files=files, data=data
+                    method,
+                    path,
+                    params=params,
+                    content=content,
+                    files=files,
+                    data=data,
+                    headers=extra_headers if extra_headers else None,
                 )
             except httpx.TimeoutException as exc:
                 last_exc = TalonicTimeoutError(message=str(exc), code="TIMEOUT")
@@ -200,13 +212,24 @@ class AsyncTransport(BaseTransport):
         files: dict[str, Any] | None = None,
         data: dict[str, Any] | None = None,
     ) -> WithRateLimit[Any]:
-        json_body = json  # avoid shadowing the `json` stdlib module below
+        # Serialize JSON manually so we control formatting (spaces after separators).
+        content: bytes | None = None
+        extra_headers: dict[str, str] = {}
+        if json is not None:
+            content = _json_module.dumps(json).encode()
+            extra_headers["Content-Type"] = "application/json"
         attempt = 0
         last_exc: TalonicError | None = None
         while True:
             try:
                 response = await self._client.request(
-                    method, path, params=params, json=json_body, files=files, data=data
+                    method,
+                    path,
+                    params=params,
+                    content=content,
+                    files=files,
+                    data=data,
+                    headers=extra_headers if extra_headers else None,
                 )
             except httpx.TimeoutException as exc:
                 last_exc = TalonicTimeoutError(message=str(exc), code="TIMEOUT")
