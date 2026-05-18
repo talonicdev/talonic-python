@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Invoice Schema",
+      "definition": {
+        "type": "object",
+        "properties": {
+          "invoice_number": {"type": "string", "title": "Invoice Number"}
+        }
+      },
+      "created_at": "2026-04-25T14:30:00.000Z"
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "limit": 20,
+    "has_more": false,
+    "next_cursor": null
+  }
+}

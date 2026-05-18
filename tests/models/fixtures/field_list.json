@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "canonical_name": "invoice_number",
+      "data_type": "string",
+      "tier": 1,
+      "occurrence_count": 142,
+      "is_universal": false,
+      "created_at": "2026-04-25T14:30:00.000Z"
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "limit": 20,
+    "has_more": false,
+    "next_cursor": null
+  }
+}
