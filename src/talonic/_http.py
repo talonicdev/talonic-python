@@ -7,6 +7,7 @@ retry-decision logic, exponential backoff with jitter, header parsing.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import random
 import time
@@ -163,6 +164,79 @@ class SyncTransport(BaseTransport):
             # Network/timeout fall-through:
             if self._should_retry_attempt(attempt):
                 time.sleep(self._backoff_delay(attempt))
+                attempt += 1
+                continue
+            raise cast(TalonicError, last_exc)
+
+
+class AsyncTransport(BaseTransport):
+    """Async HTTP transport built on httpx.AsyncClient. Mirrors SyncTransport semantics exactly."""
+
+    def __init__(self, config: TalonicConfig) -> None:
+        super().__init__(config)
+        self._client = httpx.AsyncClient(
+            base_url=config.base_url or "",
+            timeout=config.timeout,
+            headers=self._build_headers(),
+            transport=config.transport,
+        )
+
+    async def __aenter__(self) -> AsyncTransport:
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+    async def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        files: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> WithRateLimit[Any]:
+        json_body = json  # avoid shadowing the `json` stdlib module below
+        attempt = 0
+        last_exc: TalonicError | None = None
+        while True:
+            try:
+                response = await self._client.request(
+                    method, path, params=params, json=json_body, files=files, data=data
+                )
+            except httpx.TimeoutException as exc:
+                last_exc = TalonicTimeoutError(message=str(exc), code="TIMEOUT")
+            except httpx.NetworkError as exc:
+                last_exc = TalonicNetworkError(message=str(exc), code="NETWORK")
+            else:
+                if response.status_code < 400:
+                    body = response.json() if response.content else {}
+                    return WithRateLimit(
+                        data=body,
+                        rate_limit=parse_rate_limit(response.headers),
+                        cost=parse_cost(response.headers),
+                    )
+                body = {}
+                with contextlib.suppress(JSONDecodeError):
+                    body = response.json()
+                if self._should_retry_status(
+                    response.status_code, body
+                ) and self._should_retry_attempt(attempt):
+                    delay = self._retry_after_seconds(response.headers) or self._backoff_delay(
+                        attempt
+                    )
+                    await asyncio.sleep(delay)
+                    attempt += 1
+                    continue
+                raise _build_error(response)
+
+            # Network/timeout fall-through:
+            if self._should_retry_attempt(attempt):
+                await asyncio.sleep(self._backoff_delay(attempt))
                 attempt += 1
                 continue
             raise cast(TalonicError, last_exc)
