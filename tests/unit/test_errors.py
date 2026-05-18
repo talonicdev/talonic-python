@@ -63,7 +63,6 @@ def test_classify_unknown_status_returns_base() -> None:
     assert classify_http_error(418) is TalonicError
 
 
-@pytest.mark.skip(reason="re-enable when T6 ships _types/rate_limit.py")
 def test_rate_limit_error_carries_rate_limit_field() -> None:
     from talonic._types.rate_limit import RateLimitInfo  # forward dep — added in Task 6
 
