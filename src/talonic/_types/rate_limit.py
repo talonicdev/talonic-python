@@ -7,6 +7,8 @@ from typing import Generic, TypeVar
 
 import httpx
 
+from talonic._types.cost import CostInfo
+
 T = TypeVar("T")
 
 
@@ -38,8 +40,7 @@ class WithRateLimit(Generic[T]):
 
     data: T
     rate_limit: RateLimitInfo | None
-    # CostInfo | None — typed as object to avoid a circular import; refined at the resource layer.
-    cost: object | None
+    cost: CostInfo | None
 
 
 def parse_rate_limit(headers: httpx.Headers) -> RateLimitInfo | None:
