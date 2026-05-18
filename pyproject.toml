@@ -72,12 +72,6 @@ strict = true
 warn_unused_ignores = true
 exclude = ["src/talonic/_models/", "tests/"]
 
-# Suppress import-not-found for internal _types subpackage until all modules land.
-# Remove this override once all _types/*.py files exist (after T6–T8).
-[[tool.mypy.overrides]]
-module = "talonic._types.*"
-ignore_missing_imports = true
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
