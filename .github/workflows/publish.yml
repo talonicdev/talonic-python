@@ -1,0 +1,74 @@
+name: Publish talonic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "docs/**"
+      - "pyproject.toml"
+      - "package.json"
+
+permissions:
+  contents: write     # for the chore: bump commit
+  id-token: write     # for PyPI Trusted Publisher (OIDC)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install npm + Python build deps
+        run: |
+          npm ci
+          pip install -e ".[dev]"
+          pip install build hatch
+
+      - name: Build (verify before bumping)
+        run: python -m build
+
+      - name: Auto-bump patch version
+        id: version
+        run: |
+          CURRENT=$(python -c "from src.talonic._version import __version__; print(__version__)")
+          REMOTE=$(pip index versions talonic 2>/dev/null | head -n1 | sed -E 's/.*\(([^)]+)\).*/\1/' || echo "0.0.0")
+          if [ "$CURRENT" = "$REMOTE" ]; then
+            hatch version patch
+            NEW=$(python -c "from src.talonic._version import __version__; print(__version__)")
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+            echo "version=$NEW"   >> "$GITHUB_OUTPUT"
+          else
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rebuild after bump
+        if: steps.version.outputs.bumped == 'true'
+        run: |
+          rm -rf dist
+          python -m build
+
+      - name: Commit version bump
+        if: steps.version.outputs.bumped == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/talonic/_version.py
+          git commit -m "chore: bump talonic to ${{ steps.version.outputs.version }} [skip ci]"
+          git push
+
+      - name: Publish to PyPI (Trusted Publisher / OIDC)
+        uses: pypa/gh-action-pypi-publish@release/v1
