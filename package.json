@@ -4,6 +4,6 @@
   "private": true,
   "description": "Pins @talonic/docs as the OpenAPI spec source for the Python SDK codegen pipeline.",
   "devDependencies": {
-    "@talonic/docs": "^0.20.18"
+    "@talonic/docs": "^0.20.32"
   }
 }
