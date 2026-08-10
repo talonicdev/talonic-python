@@ -498,11 +498,16 @@ def main() -> int:
 
     cmd = [
         "datamodel-codegen",
-        "--input", str(SPEC),
-        "--input-file-type", "openapi",
-        "--output", str(OUT),
-        "--output-model-type", "pydantic_v2.BaseModel",
-        "--target-python-version", "3.10",
+        "--input",
+        str(SPEC),
+        "--input-file-type",
+        "openapi",
+        "--output",
+        str(OUT),
+        "--output-model-type",
+        "pydantic_v2.BaseModel",
+        "--target-python-version",
+        "3.10",
         "--use-union-operator",
         "--use-standard-collections",
         "--use-schema-description",
@@ -805,8 +810,12 @@ def test_base_error_has_required_fields():
 
 def test_all_subclasses_inherit_from_base():
     for cls in (
-        TalonicAuthError, TalonicNotFoundError, TalonicValidationError,
-        TalonicRateLimitError, TalonicServerError, TalonicNetworkError,
+        TalonicAuthError,
+        TalonicNotFoundError,
+        TalonicValidationError,
+        TalonicRateLimitError,
+        TalonicServerError,
+        TalonicNetworkError,
         TalonicTimeoutError,
     ):
         assert issubclass(cls, TalonicError)
@@ -840,6 +849,7 @@ def test_classify_unknown_status_returns_base():
 
 def test_rate_limit_error_carries_rate_limit_field():
     from talonic._types.rate_limit import RateLimitInfo  # forward dep — added in Task 6
+
     rl = RateLimitInfo(limit=100, remaining=0, reset_at=0)
     err = TalonicRateLimitError(message="rl", status=429, code="RL", rate_limit=rl)
     assert err.rate_limit is rl
@@ -986,7 +996,13 @@ def headers(**kwargs) -> httpx.Headers:
 
 
 def test_parse_rate_limit_present():
-    h = headers(**{"X-RateLimit-Limit": "100", "X-RateLimit-Remaining": "42", "X-RateLimit-Reset": "1700000000"})
+    h = headers(
+        **{
+            "X-RateLimit-Limit": "100",
+            "X-RateLimit-Remaining": "42",
+            "X-RateLimit-Reset": "1700000000",
+        }
+    )
     rl = parse_rate_limit(h)
     assert rl == RateLimitInfo(limit=100, remaining=42, reset_at=1700000000)
 
@@ -1015,7 +1031,9 @@ def test_parse_rate_limit_garbage_returns_none(bad):
     if isinstance(bad, dict):
         assert parse_rate_limit(headers()) is None
     else:
-        h = headers(**{"X-RateLimit-Limit": bad, "X-RateLimit-Remaining": bad, "X-RateLimit-Reset": bad})
+        h = headers(
+            **{"X-RateLimit-Limit": bad, "X-RateLimit-Remaining": bad, "X-RateLimit-Reset": bad}
+        )
         assert parse_rate_limit(h) is None
 ```
 
@@ -1072,7 +1090,9 @@ class WithRateLimit(Generic[T]):
 
     data: T
     rate_limit: RateLimitInfo | None
-    cost: object | None  # CostInfo | None — typed as object to avoid a circular import; refined at the resource layer.
+    cost: (
+        object | None
+    )  # CostInfo | None — typed as object to avoid a circular import; refined at the resource layer.
 
 
 def parse_rate_limit(headers: httpx.Headers) -> RateLimitInfo | None:
@@ -1131,13 +1151,15 @@ def headers(**kwargs) -> httpx.Headers:
 
 
 def test_parse_cost_full_set():
-    h = headers(**{
-        "X-Talonic-Cost-Credits": "12",
-        "X-Talonic-Cost-EUR": "0.024",
-        "X-Talonic-Balance-Credits": "988",
-        "X-Talonic-Cells-Resolved-Registry": "30",
-        "X-Talonic-Cells-Resolved-AI": "70",
-    })
+    h = headers(
+        **{
+            "X-Talonic-Cost-Credits": "12",
+            "X-Talonic-Cost-EUR": "0.024",
+            "X-Talonic-Balance-Credits": "988",
+            "X-Talonic-Cells-Resolved-Registry": "30",
+            "X-Talonic-Cells-Resolved-AI": "70",
+        }
+    )
     c = parse_cost(h)
     assert c == CostInfo(
         cost_credits=12,
@@ -1752,7 +1774,9 @@ def test_get_success_parses_rate_limit_and_cost(transport):
 @respx.mock
 def test_401_raises_auth_error(transport):
     respx.get("https://api.talonic.com/v1/x").mock(
-        return_value=httpx.Response(401, json={"code": "AUTH", "message": "bad", "request_id": "rq_1"})
+        return_value=httpx.Response(
+            401, json={"code": "AUTH", "message": "bad", "request_id": "rq_1"}
+        )
     )
     with pytest.raises(TalonicAuthError) as exc:
         transport.request("GET", "/v1/x")
@@ -1771,9 +1795,15 @@ def test_404_raises_not_found(transport):
 @respx.mock
 def test_429_retries_then_raises(transport):
     route = respx.get("https://api.talonic.com/v1/x").mock(
-        return_value=httpx.Response(429, json={"code": "RL", "message": "rate limited"},
-                                    headers={"X-RateLimit-Limit": "1", "X-RateLimit-Remaining": "0",
-                                             "X-RateLimit-Reset": "1700000000"})
+        return_value=httpx.Response(
+            429,
+            json={"code": "RL", "message": "rate limited"},
+            headers={
+                "X-RateLimit-Limit": "1",
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": "1700000000",
+            },
+        )
     )
     with pytest.raises(TalonicRateLimitError) as exc:
         transport.request("GET", "/v1/x")
@@ -1902,11 +1932,12 @@ class SyncTransport(BaseTransport):
                     body = response.json()
                 except Exception:
                     pass
-                if (
-                    self._should_retry_status(response.status_code, body)
-                    and self._should_retry_attempt(attempt)
-                ):
-                    delay = self._retry_after_seconds(response.headers) or self._backoff_delay(attempt)
+                if self._should_retry_status(
+                    response.status_code, body
+                ) and self._should_retry_attempt(attempt):
+                    delay = self._retry_after_seconds(response.headers) or self._backoff_delay(
+                        attempt
+                    )
                     time.sleep(delay)
                     attempt += 1
                     continue
@@ -1963,14 +1994,18 @@ async def transport():
 
 @respx.mock
 async def test_async_get_success(transport):
-    respx.get("https://api.talonic.com/v1/ping").mock(return_value=httpx.Response(200, json={"ok": True}))
+    respx.get("https://api.talonic.com/v1/ping").mock(
+        return_value=httpx.Response(200, json={"ok": True})
+    )
     result = await transport.request("GET", "/v1/ping")
     assert result.data == {"ok": True}
 
 
 @respx.mock
 async def test_async_401(transport):
-    respx.get("https://api.talonic.com/v1/x").mock(return_value=httpx.Response(401, json={"code": "AUTH", "message": "bad"}))
+    respx.get("https://api.talonic.com/v1/x").mock(
+        return_value=httpx.Response(401, json={"code": "AUTH", "message": "bad"})
+    )
     with pytest.raises(TalonicAuthError):
         await transport.request("GET", "/v1/x")
 
@@ -1978,9 +2013,15 @@ async def test_async_401(transport):
 @respx.mock
 async def test_async_429_retries(transport):
     route = respx.get("https://api.talonic.com/v1/x").mock(
-        return_value=httpx.Response(429, json={"code": "RL", "message": "rl"},
-                                    headers={"X-RateLimit-Limit": "1", "X-RateLimit-Remaining": "0",
-                                             "X-RateLimit-Reset": "1"})
+        return_value=httpx.Response(
+            429,
+            json={"code": "RL", "message": "rl"},
+            headers={
+                "X-RateLimit-Limit": "1",
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": "1",
+            },
+        )
     )
     with pytest.raises(TalonicRateLimitError):
         await transport.request("GET", "/v1/x")
@@ -2053,11 +2094,12 @@ class AsyncTransport(BaseTransport):
                     body = response.json()
                 except Exception:
                     pass
-                if (
-                    self._should_retry_status(response.status_code, body)
-                    and self._should_retry_attempt(attempt)
-                ):
-                    delay = self._retry_after_seconds(response.headers) or self._backoff_delay(attempt)
+                if self._should_retry_status(
+                    response.status_code, body
+                ) and self._should_retry_attempt(attempt):
+                    delay = self._retry_after_seconds(response.headers) or self._backoff_delay(
+                        attempt
+                    )
                     await asyncio.sleep(delay)
                     attempt += 1
                     continue
@@ -2163,7 +2205,9 @@ from talonic.resources.schemas import AsyncSchemas, Schemas
 @respx.mock
 def test_schemas_list_sync(sync_transport):
     respx.get("https://api.talonic.com/v1/schemas").mock(
-        return_value=httpx.Response(200, json={"data": [{"id": "s1", "name": "Invoice"}], "pagination": {"total": 1}})
+        return_value=httpx.Response(
+            200, json={"data": [{"id": "s1", "name": "Invoice"}], "pagination": {"total": 1}}
+        )
     )
     r = Schemas(sync_transport).list()
     assert len(r.data["data"]) == 1
@@ -2173,7 +2217,9 @@ def test_schemas_list_sync(sync_transport):
 @respx.mock
 def test_schemas_get_sync(sync_transport):
     respx.get("https://api.talonic.com/v1/schemas/s1").mock(
-        return_value=httpx.Response(200, json={"id": "s1", "name": "Invoice", "short_id": "SCH-INV"})
+        return_value=httpx.Response(
+            200, json={"id": "s1", "name": "Invoice", "short_id": "SCH-INV"}
+        )
     )
     r = Schemas(sync_transport).get("s1")
     assert r.data["id"] == "s1"
@@ -2186,7 +2232,9 @@ def test_schemas_create_sync(sync_transport):
     )
     r = Schemas(sync_transport).create(name="Receipt", definition={"type": "object"})
     assert r.data["id"] == "s2"
-    assert route.calls.last.request.read() == b'{"name": "Receipt", "definition": {"type": "object"}}'
+    assert (
+        route.calls.last.request.read() == b'{"name": "Receipt", "definition": {"type": "object"}}'
+    )
 
 
 @respx.mock
@@ -2269,18 +2317,29 @@ class Schemas:
     def get(self, schema_id: str) -> WithRateLimit[Any]:
         return self._t.request("GET", f"/v1/schemas/{schema_id}")
 
-    def create(self, *, name: str, definition: dict[str, Any], description: str | None = None) -> WithRateLimit[Any]:
+    def create(
+        self, *, name: str, definition: dict[str, Any], description: str | None = None
+    ) -> WithRateLimit[Any]:
         body: dict[str, Any] = {"name": name, "definition": definition}
         if description is not None:
             body["description"] = description
         return self._t.request("POST", "/v1/schemas", json=body)
 
-    def update(self, schema_id: str, *, name: str | None = None, definition: dict[str, Any] | None = None,
-               description: str | None = None) -> WithRateLimit[Any]:
+    def update(
+        self,
+        schema_id: str,
+        *,
+        name: str | None = None,
+        definition: dict[str, Any] | None = None,
+        description: str | None = None,
+    ) -> WithRateLimit[Any]:
         body: dict[str, Any] = {}
-        if name is not None: body["name"] = name
-        if definition is not None: body["definition"] = definition
-        if description is not None: body["description"] = description
+        if name is not None:
+            body["name"] = name
+        if definition is not None:
+            body["definition"] = definition
+        if description is not None:
+            body["description"] = description
         return self._t.request("PUT", f"/v1/schemas/{schema_id}", json=body)
 
     def delete(self, schema_id: str) -> WithRateLimit[Any]:
@@ -2299,18 +2358,29 @@ class AsyncSchemas:
     async def get(self, schema_id: str) -> WithRateLimit[Any]:
         return await self._t.request("GET", f"/v1/schemas/{schema_id}")
 
-    async def create(self, *, name: str, definition: dict[str, Any], description: str | None = None) -> WithRateLimit[Any]:
+    async def create(
+        self, *, name: str, definition: dict[str, Any], description: str | None = None
+    ) -> WithRateLimit[Any]:
         body: dict[str, Any] = {"name": name, "definition": definition}
         if description is not None:
             body["description"] = description
         return await self._t.request("POST", "/v1/schemas", json=body)
 
-    async def update(self, schema_id: str, *, name: str | None = None, definition: dict[str, Any] | None = None,
-                     description: str | None = None) -> WithRateLimit[Any]:
+    async def update(
+        self,
+        schema_id: str,
+        *,
+        name: str | None = None,
+        definition: dict[str, Any] | None = None,
+        description: str | None = None,
+    ) -> WithRateLimit[Any]:
         body: dict[str, Any] = {}
-        if name is not None: body["name"] = name
-        if definition is not None: body["definition"] = definition
-        if description is not None: body["description"] = description
+        if name is not None:
+            body["name"] = name
+        if definition is not None:
+            body["definition"] = definition
+        if description is not None:
+            body["description"] = description
         return await self._t.request("PUT", f"/v1/schemas/{schema_id}", json=body)
 
     async def delete(self, schema_id: str) -> WithRateLimit[Any]:
@@ -2351,10 +2421,17 @@ from talonic.resources.credits import AsyncCredits, Credits
 @respx.mock
 def test_get_balance_sync(sync_transport):
     respx.get("https://api.talonic.com/v1/credits/balance").mock(
-        return_value=httpx.Response(200, json={
-            "balance_credits": 1000, "balance_eur": 2.0, "burn_rate_30d_credits": 50,
-            "projected_runway_days": 600, "tier": "standard", "tier_resets_at": "2026-06-01T00:00:00Z",
-        })
+        return_value=httpx.Response(
+            200,
+            json={
+                "balance_credits": 1000,
+                "balance_eur": 2.0,
+                "burn_rate_30d_credits": 50,
+                "projected_runway_days": 600,
+                "tier": "standard",
+                "tier_resets_at": "2026-06-01T00:00:00Z",
+            },
+        )
     )
     r = Credits(sync_transport).get_balance()
     assert r.data["balance_credits"] == 1000
@@ -2444,7 +2521,9 @@ def test_list_with_params(sync_transport):
 
 @respx.mock
 def test_get(sync_transport):
-    respx.get("https://api.talonic.com/v1/documents/d1").mock(return_value=httpx.Response(200, json={"id": "d1"}))
+    respx.get("https://api.talonic.com/v1/documents/d1").mock(
+        return_value=httpx.Response(200, json={"id": "d1"})
+    )
     assert Documents(sync_transport).get("d1").data["id"] == "d1"
 
 
@@ -2514,22 +2593,36 @@ from talonic._types.rate_limit import WithRateLimit
 
 
 def _list_params(
-    *, limit: int | None, cursor: str | None, status: str | None,
-    source_id: str | None, search: str | None, after: str | None, before: str | None,
+    *,
+    limit: int | None,
+    cursor: str | None,
+    status: str | None,
+    source_id: str | None,
+    search: str | None,
+    after: str | None,
+    before: str | None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
-    if limit is not None: params["limit"] = limit
-    if cursor is not None: params["cursor"] = cursor
-    if status is not None: params["status"] = status
-    if source_id is not None: params["source_id"] = source_id
-    if search is not None: params["search"] = search
-    if after is not None: params["after"] = after
-    if before is not None: params["before"] = before
+    if limit is not None:
+        params["limit"] = limit
+    if cursor is not None:
+        params["cursor"] = cursor
+    if status is not None:
+        params["status"] = status
+    if source_id is not None:
+        params["source_id"] = source_id
+    if search is not None:
+        params["search"] = search
+    if after is not None:
+        params["after"] = after
+    if before is not None:
+        params["before"] = before
     return params
 
 
 def _filter_body(
-    *, conditions: list[dict[str, Any]],
+    *,
+    conditions: list[dict[str, Any]],
     sort: dict[str, Any] | None,
     search: str | None,
     limit: int | None,
@@ -2537,11 +2630,16 @@ def _filter_body(
     source_connection_id: str | None,
 ) -> dict[str, Any]:
     body: dict[str, Any] = {"conditions": conditions}
-    if sort is not None: body["sort"] = sort
-    if search is not None: body["search"] = search
-    if limit is not None: body["limit"] = limit
-    if cursor is not None: body["cursor"] = cursor
-    if source_connection_id is not None: body["source_connection_id"] = source_connection_id
+    if sort is not None:
+        body["sort"] = sort
+    if search is not None:
+        body["search"] = search
+    if limit is not None:
+        body["limit"] = limit
+    if cursor is not None:
+        body["cursor"] = cursor
+    if source_connection_id is not None:
+        body["source_connection_id"] = source_connection_id
     return body
 
 
@@ -2549,12 +2647,30 @@ class Documents:
     def __init__(self, transport: SyncTransport) -> None:
         self._t = transport
 
-    def list(self, *, limit: int | None = None, cursor: str | None = None, status: str | None = None,
-             source_id: str | None = None, search: str | None = None,
-             after: str | None = None, before: str | None = None) -> WithRateLimit[Any]:
-        return self._t.request("GET", "/v1/documents",
-                                params=_list_params(limit=limit, cursor=cursor, status=status,
-                                                    source_id=source_id, search=search, after=after, before=before))
+    def list(
+        self,
+        *,
+        limit: int | None = None,
+        cursor: str | None = None,
+        status: str | None = None,
+        source_id: str | None = None,
+        search: str | None = None,
+        after: str | None = None,
+        before: str | None = None,
+    ) -> WithRateLimit[Any]:
+        return self._t.request(
+            "GET",
+            "/v1/documents",
+            params=_list_params(
+                limit=limit,
+                cursor=cursor,
+                status=status,
+                source_id=source_id,
+                search=search,
+                after=after,
+                before=before,
+            ),
+        )
 
     def get(self, document_id: str) -> WithRateLimit[Any]:
         return self._t.request("GET", f"/v1/documents/{document_id}")
@@ -2562,35 +2678,75 @@ class Documents:
     def get_markdown(self, document_id: str) -> WithRateLimit[Any]:
         return self._t.request("GET", f"/v1/documents/{document_id}/markdown")
 
-    def re_extract(self, document_id: str, *, schema: dict[str, Any] | None = None,
-                   schema_id: str | None = None) -> WithRateLimit[Any]:
+    def re_extract(
+        self,
+        document_id: str,
+        *,
+        schema: dict[str, Any] | None = None,
+        schema_id: str | None = None,
+    ) -> WithRateLimit[Any]:
         body: dict[str, Any] = {}
-        if schema is not None: body["schema"] = schema
-        if schema_id is not None: body["schema_id"] = schema_id
+        if schema is not None:
+            body["schema"] = schema
+        if schema_id is not None:
+            body["schema_id"] = schema_id
         return self._t.request("POST", f"/v1/documents/{document_id}/re-extract", json=body)
 
     def delete(self, document_id: str) -> WithRateLimit[Any]:
         return self._t.request("DELETE", f"/v1/documents/{document_id}")
 
-    def filter(self, *, conditions: list[dict[str, Any]], sort: dict[str, Any] | None = None,
-               search: str | None = None, limit: int | None = None, cursor: str | None = None,
-               source_connection_id: str | None = None) -> WithRateLimit[Any]:
-        return self._t.request("POST", "/v1/documents/filter",
-                                json=_filter_body(conditions=conditions, sort=sort, search=search,
-                                                  limit=limit, cursor=cursor,
-                                                  source_connection_id=source_connection_id))
+    def filter(
+        self,
+        *,
+        conditions: list[dict[str, Any]],
+        sort: dict[str, Any] | None = None,
+        search: str | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
+        source_connection_id: str | None = None,
+    ) -> WithRateLimit[Any]:
+        return self._t.request(
+            "POST",
+            "/v1/documents/filter",
+            json=_filter_body(
+                conditions=conditions,
+                sort=sort,
+                search=search,
+                limit=limit,
+                cursor=cursor,
+                source_connection_id=source_connection_id,
+            ),
+        )
 
 
 class AsyncDocuments:
     def __init__(self, transport: AsyncTransport) -> None:
         self._t = transport
 
-    async def list(self, *, limit: int | None = None, cursor: str | None = None, status: str | None = None,
-                   source_id: str | None = None, search: str | None = None,
-                   after: str | None = None, before: str | None = None) -> WithRateLimit[Any]:
-        return await self._t.request("GET", "/v1/documents",
-                                       params=_list_params(limit=limit, cursor=cursor, status=status,
-                                                           source_id=source_id, search=search, after=after, before=before))
+    async def list(
+        self,
+        *,
+        limit: int | None = None,
+        cursor: str | None = None,
+        status: str | None = None,
+        source_id: str | None = None,
+        search: str | None = None,
+        after: str | None = None,
+        before: str | None = None,
+    ) -> WithRateLimit[Any]:
+        return await self._t.request(
+            "GET",
+            "/v1/documents",
+            params=_list_params(
+                limit=limit,
+                cursor=cursor,
+                status=status,
+                source_id=source_id,
+                search=search,
+                after=after,
+                before=before,
+            ),
+        )
 
     async def get(self, document_id: str) -> WithRateLimit[Any]:
         return await self._t.request("GET", f"/v1/documents/{document_id}")
@@ -2598,23 +2754,45 @@ class AsyncDocuments:
     async def get_markdown(self, document_id: str) -> WithRateLimit[Any]:
         return await self._t.request("GET", f"/v1/documents/{document_id}/markdown")
 
-    async def re_extract(self, document_id: str, *, schema: dict[str, Any] | None = None,
-                         schema_id: str | None = None) -> WithRateLimit[Any]:
+    async def re_extract(
+        self,
+        document_id: str,
+        *,
+        schema: dict[str, Any] | None = None,
+        schema_id: str | None = None,
+    ) -> WithRateLimit[Any]:
         body: dict[str, Any] = {}
-        if schema is not None: body["schema"] = schema
-        if schema_id is not None: body["schema_id"] = schema_id
+        if schema is not None:
+            body["schema"] = schema
+        if schema_id is not None:
+            body["schema_id"] = schema_id
         return await self._t.request("POST", f"/v1/documents/{document_id}/re-extract", json=body)
 
     async def delete(self, document_id: str) -> WithRateLimit[Any]:
         return await self._t.request("DELETE", f"/v1/documents/{document_id}")
 
-    async def filter(self, *, conditions: list[dict[str, Any]], sort: dict[str, Any] | None = None,
-                     search: str | None = None, limit: int | None = None, cursor: str | None = None,
-                     source_connection_id: str | None = None) -> WithRateLimit[Any]:
-        return await self._t.request("POST", "/v1/documents/filter",
-                                       json=_filter_body(conditions=conditions, sort=sort, search=search,
-                                                         limit=limit, cursor=cursor,
-                                                         source_connection_id=source_connection_id))
+    async def filter(
+        self,
+        *,
+        conditions: list[dict[str, Any]],
+        sort: dict[str, Any] | None = None,
+        search: str | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
+        source_connection_id: str | None = None,
+    ) -> WithRateLimit[Any]:
+        return await self._t.request(
+            "POST",
+            "/v1/documents/filter",
+            json=_filter_body(
+                conditions=conditions,
+                sort=sort,
+                search=search,
+                limit=limit,
+                cursor=cursor,
+                source_connection_id=source_connection_id,
+            ),
+        )
 ```
 
 - [ ] **Step 16.4: Run test, confirm pass**
@@ -2649,13 +2827,17 @@ from talonic.resources.extractions import AsyncExtractions, Extractions
 
 @respx.mock
 def test_list(sync_transport):
-    respx.get("https://api.talonic.com/v1/extractions").mock(return_value=httpx.Response(200, json={"data": []}))
+    respx.get("https://api.talonic.com/v1/extractions").mock(
+        return_value=httpx.Response(200, json={"data": []})
+    )
     Extractions(sync_transport).list(document_id="d1")
 
 
 @respx.mock
 def test_get(sync_transport):
-    respx.get("https://api.talonic.com/v1/extractions/e1").mock(return_value=httpx.Response(200, json={"id": "e1"}))
+    respx.get("https://api.talonic.com/v1/extractions/e1").mock(
+        return_value=httpx.Response(200, json={"id": "e1"})
+    )
     Extractions(sync_transport).get("e1")
 
 
@@ -2671,7 +2853,9 @@ def test_get_data_json(sync_transport):
 @respx.mock
 def test_get_data_csv(sync_transport):
     respx.get("https://api.talonic.com/v1/extractions/e1/data").mock(
-        return_value=httpx.Response(200, text="vendor_name\nAcme\n", headers={"content-type": "text/csv"})
+        return_value=httpx.Response(
+            200, text="vendor_name\nAcme\n", headers={"content-type": "text/csv"}
+        )
     )
     csv = Extractions(sync_transport).get_data("e1", format="csv")
     assert csv.startswith("vendor_name")
@@ -2682,14 +2866,18 @@ def test_patch(sync_transport):
     route = respx.patch("https://api.talonic.com/v1/extractions/e1/data").mock(
         return_value=httpx.Response(200, json={"updated": True})
     )
-    Extractions(sync_transport).patch("e1", corrections=[{"path": "vendor_name", "value": "Acme Corp"}])
+    Extractions(sync_transport).patch(
+        "e1", corrections=[{"path": "vendor_name", "value": "Acme Corp"}]
+    )
     body = route.calls.last.request.read()
     assert b"corrections" in body
 
 
 @respx.mock
 async def test_get_data_async(async_transport):
-    respx.get("https://api.talonic.com/v1/extractions/e1/data").mock(return_value=httpx.Response(200, json={}))
+    respx.get("https://api.talonic.com/v1/extractions/e1/data").mock(
+        return_value=httpx.Response(200, json={})
+    )
     await AsyncExtractions(async_transport).get_data("e1")
 ```
 
@@ -2715,11 +2903,16 @@ from talonic._http import AsyncTransport, SyncTransport
 from talonic._types.rate_limit import WithRateLimit
 
 
-def _list_params(*, document_id: str | None, limit: int | None, cursor: str | None) -> dict[str, Any]:
+def _list_params(
+    *, document_id: str | None, limit: int | None, cursor: str | None
+) -> dict[str, Any]:
     p: dict[str, Any] = {}
-    if document_id is not None: p["document_id"] = document_id
-    if limit is not None: p["limit"] = limit
-    if cursor is not None: p["cursor"] = cursor
+    if document_id is not None:
+        p["document_id"] = document_id
+    if limit is not None:
+        p["limit"] = limit
+    if cursor is not None:
+        p["cursor"] = cursor
     return p
 
 
@@ -2727,10 +2920,14 @@ class Extractions:
     def __init__(self, transport: SyncTransport) -> None:
         self._t = transport
 
-    def list(self, *, document_id: str | None = None, limit: int | None = None,
-             cursor: str | None = None) -> WithRateLimit[Any]:
-        return self._t.request("GET", "/v1/extractions",
-                                params=_list_params(document_id=document_id, limit=limit, cursor=cursor))
+    def list(
+        self, *, document_id: str | None = None, limit: int | None = None, cursor: str | None = None
+    ) -> WithRateLimit[Any]:
+        return self._t.request(
+            "GET",
+            "/v1/extractions",
+            params=_list_params(document_id=document_id, limit=limit, cursor=cursor),
+        )
 
     def get(self, extraction_id: str) -> WithRateLimit[Any]:
         return self._t.request("GET", f"/v1/extractions/{extraction_id}")
@@ -2739,7 +2936,9 @@ class Extractions:
     def get_data(self, extraction_id: str) -> WithRateLimit[dict[str, Any]]: ...
     @overload
     def get_data(self, extraction_id: str, *, format: Literal["csv"]) -> str: ...
-    def get_data(self, extraction_id: str, *, format: Literal["csv"] | None = None) -> WithRateLimit[Any] | str:
+    def get_data(
+        self, extraction_id: str, *, format: Literal["csv"] | None = None
+    ) -> WithRateLimit[Any] | str:
         params = {"format": "csv"} if format == "csv" else None
         if format == "csv":
             # Bypass JSON parsing — return the raw response body.
@@ -2749,18 +2948,23 @@ class Extractions:
         return self._t.request("GET", f"/v1/extractions/{extraction_id}/data")
 
     def patch(self, extraction_id: str, *, corrections: list[dict[str, Any]]) -> WithRateLimit[Any]:
-        return self._t.request("PATCH", f"/v1/extractions/{extraction_id}/data",
-                                json={"corrections": corrections})
+        return self._t.request(
+            "PATCH", f"/v1/extractions/{extraction_id}/data", json={"corrections": corrections}
+        )
 
 
 class AsyncExtractions:
     def __init__(self, transport: AsyncTransport) -> None:
         self._t = transport
 
-    async def list(self, *, document_id: str | None = None, limit: int | None = None,
-                   cursor: str | None = None) -> WithRateLimit[Any]:
-        return await self._t.request("GET", "/v1/extractions",
-                                       params=_list_params(document_id=document_id, limit=limit, cursor=cursor))
+    async def list(
+        self, *, document_id: str | None = None, limit: int | None = None, cursor: str | None = None
+    ) -> WithRateLimit[Any]:
+        return await self._t.request(
+            "GET",
+            "/v1/extractions",
+            params=_list_params(document_id=document_id, limit=limit, cursor=cursor),
+        )
 
     async def get(self, extraction_id: str) -> WithRateLimit[Any]:
         return await self._t.request("GET", f"/v1/extractions/{extraction_id}")
@@ -2769,16 +2973,23 @@ class AsyncExtractions:
     async def get_data(self, extraction_id: str) -> WithRateLimit[dict[str, Any]]: ...
     @overload
     async def get_data(self, extraction_id: str, *, format: Literal["csv"]) -> str: ...
-    async def get_data(self, extraction_id: str, *, format: Literal["csv"] | None = None) -> WithRateLimit[Any] | str:
+    async def get_data(
+        self, extraction_id: str, *, format: Literal["csv"] | None = None
+    ) -> WithRateLimit[Any] | str:
         if format == "csv":
-            r = await self._t._client.get(f"/v1/extractions/{extraction_id}/data", params={"format": "csv"})
+            r = await self._t._client.get(
+                f"/v1/extractions/{extraction_id}/data", params={"format": "csv"}
+            )
             r.raise_for_status()
             return r.text
         return await self._t.request("GET", f"/v1/extractions/{extraction_id}/data")
 
-    async def patch(self, extraction_id: str, *, corrections: list[dict[str, Any]]) -> WithRateLimit[Any]:
-        return await self._t.request("PATCH", f"/v1/extractions/{extraction_id}/data",
-                                       json={"corrections": corrections})
+    async def patch(
+        self, extraction_id: str, *, corrections: list[dict[str, Any]]
+    ) -> WithRateLimit[Any]:
+        return await self._t.request(
+            "PATCH", f"/v1/extractions/{extraction_id}/data", json={"corrections": corrections}
+        )
 ```
 
 - [ ] **Step 17.4: Run test, confirm pass**
@@ -2823,7 +3034,9 @@ def test_list(sync_transport):
 
 @respx.mock
 def test_get(sync_transport):
-    respx.get("https://api.talonic.com/v1/fields/f1").mock(return_value=httpx.Response(200, json={"id": "f1"}))
+    respx.get("https://api.talonic.com/v1/fields/f1").mock(
+        return_value=httpx.Response(200, json={"id": "f1"})
+    )
     Fields(sync_transport).get("f1")
 
 
@@ -2837,7 +3050,9 @@ def test_similar(sync_transport):
 
 @respx.mock
 async def test_list_async(async_transport):
-    respx.get("https://api.talonic.com/v1/fields").mock(return_value=httpx.Response(200, json={"data": []}))
+    respx.get("https://api.talonic.com/v1/fields").mock(
+        return_value=httpx.Response(200, json={"data": []})
+    )
     await AsyncFields(async_transport).list()
 ```
 
@@ -2858,14 +3073,25 @@ from talonic._http import AsyncTransport, SyncTransport
 from talonic._types.rate_limit import WithRateLimit
 
 
-def _list_params(*, search: str | None, tier: str | None, cluster: str | None,
-                  limit: int | None, cursor: str | None) -> dict[str, Any]:
+def _list_params(
+    *,
+    search: str | None,
+    tier: str | None,
+    cluster: str | None,
+    limit: int | None,
+    cursor: str | None,
+) -> dict[str, Any]:
     p: dict[str, Any] = {}
-    if search is not None: p["search"] = search
-    if tier is not None: p["tier"] = tier
-    if cluster is not None: p["cluster"] = cluster
-    if limit is not None: p["limit"] = limit
-    if cursor is not None: p["cursor"] = cursor
+    if search is not None:
+        p["search"] = search
+    if tier is not None:
+        p["tier"] = tier
+    if cluster is not None:
+        p["cluster"] = cluster
+    if limit is not None:
+        p["limit"] = limit
+    if cursor is not None:
+        p["cursor"] = cursor
     return p
 
 
@@ -2873,11 +3099,22 @@ class Fields:
     def __init__(self, transport: SyncTransport) -> None:
         self._t = transport
 
-    def list(self, *, search: str | None = None, tier: str | None = None, cluster: str | None = None,
-             limit: int | None = None, cursor: str | None = None) -> WithRateLimit[Any]:
-        return self._t.request("GET", "/v1/fields",
-                                params=_list_params(search=search, tier=tier, cluster=cluster,
-                                                    limit=limit, cursor=cursor))
+    def list(
+        self,
+        *,
+        search: str | None = None,
+        tier: str | None = None,
+        cluster: str | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
+    ) -> WithRateLimit[Any]:
+        return self._t.request(
+            "GET",
+            "/v1/fields",
+            params=_list_params(
+                search=search, tier=tier, cluster=cluster, limit=limit, cursor=cursor
+            ),
+        )
 
     def get(self, field_id: str) -> WithRateLimit[Any]:
         return self._t.request("GET", f"/v1/fields/{field_id}")
@@ -2891,11 +3128,22 @@ class AsyncFields:
     def __init__(self, transport: AsyncTransport) -> None:
         self._t = transport
 
-    async def list(self, *, search: str | None = None, tier: str | None = None, cluster: str | None = None,
-                   limit: int | None = None, cursor: str | None = None) -> WithRateLimit[Any]:
-        return await self._t.request("GET", "/v1/fields",
-                                       params=_list_params(search=search, tier=tier, cluster=cluster,
-                                                           limit=limit, cursor=cursor))
+    async def list(
+        self,
+        *,
+        search: str | None = None,
+        tier: str | None = None,
+        cluster: str | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
+    ) -> WithRateLimit[Any]:
+        return await self._t.request(
+            "GET",
+            "/v1/fields",
+            params=_list_params(
+                search=search, tier=tier, cluster=cluster, limit=limit, cursor=cursor
+            ),
+        )
 
     async def get(self, field_id: str) -> WithRateLimit[Any]:
         return await self._t.request("GET", f"/v1/fields/{field_id}")
@@ -2948,13 +3196,17 @@ def test_create(sync_transport):
 
 @respx.mock
 def test_list(sync_transport):
-    respx.get("https://api.talonic.com/v1/jobs").mock(return_value=httpx.Response(200, json={"data": []}))
+    respx.get("https://api.talonic.com/v1/jobs").mock(
+        return_value=httpx.Response(200, json={"data": []})
+    )
     Jobs(sync_transport).list()
 
 
 @respx.mock
 def test_get(sync_transport):
-    respx.get("https://api.talonic.com/v1/jobs/j1").mock(return_value=httpx.Response(200, json={"id": "j1"}))
+    respx.get("https://api.talonic.com/v1/jobs/j1").mock(
+        return_value=httpx.Response(200, json={"id": "j1"})
+    )
     Jobs(sync_transport).get("j1")
 
 
@@ -2976,7 +3228,9 @@ def test_cancel(sync_transport):
 
 @respx.mock
 async def test_create_async(async_transport):
-    respx.post("https://api.talonic.com/v1/jobs").mock(return_value=httpx.Response(201, json={"id": "j2"}))
+    respx.post("https://api.talonic.com/v1/jobs").mock(
+        return_value=httpx.Response(201, json={"id": "j2"})
+    )
     await AsyncJobs(async_transport).create(schema_id="s1", document_ids=["d1"])
 ```
 
@@ -2999,16 +3253,21 @@ from talonic._types.rate_limit import WithRateLimit
 
 def _list_params(*, status: str | None, limit: int | None, cursor: str | None) -> dict[str, Any]:
     p: dict[str, Any] = {}
-    if status is not None: p["status"] = status
-    if limit is not None: p["limit"] = limit
-    if cursor is not None: p["cursor"] = cursor
+    if status is not None:
+        p["status"] = status
+    if limit is not None:
+        p["limit"] = limit
+    if cursor is not None:
+        p["cursor"] = cursor
     return p
 
 
-def _create_body(*, schema_id: str, document_ids: list[str],
-                  include_provenance: bool | None) -> dict[str, Any]:
+def _create_body(
+    *, schema_id: str, document_ids: list[str], include_provenance: bool | None
+) -> dict[str, Any]:
     body: dict[str, Any] = {"schema_id": schema_id, "document_ids": document_ids}
-    if include_provenance is not None: body["include_provenance"] = include_provenance
+    if include_provenance is not None:
+        body["include_provenance"] = include_provenance
     return body
 
 
@@ -3016,16 +3275,25 @@ class Jobs:
     def __init__(self, transport: SyncTransport) -> None:
         self._t = transport
 
-    def create(self, *, schema_id: str, document_ids: list[str],
-                include_provenance: bool | None = None) -> WithRateLimit[Any]:
-        return self._t.request("POST", "/v1/jobs",
-                                json=_create_body(schema_id=schema_id, document_ids=document_ids,
-                                                  include_provenance=include_provenance))
+    def create(
+        self, *, schema_id: str, document_ids: list[str], include_provenance: bool | None = None
+    ) -> WithRateLimit[Any]:
+        return self._t.request(
+            "POST",
+            "/v1/jobs",
+            json=_create_body(
+                schema_id=schema_id,
+                document_ids=document_ids,
+                include_provenance=include_provenance,
+            ),
+        )
 
-    def list(self, *, status: str | None = None, limit: int | None = None,
-             cursor: str | None = None) -> WithRateLimit[Any]:
-        return self._t.request("GET", "/v1/jobs",
-                                params=_list_params(status=status, limit=limit, cursor=cursor))
+    def list(
+        self, *, status: str | None = None, limit: int | None = None, cursor: str | None = None
+    ) -> WithRateLimit[Any]:
+        return self._t.request(
+            "GET", "/v1/jobs", params=_list_params(status=status, limit=limit, cursor=cursor)
+        )
 
     def get(self, job_id: str) -> WithRateLimit[Any]:
         return self._t.request("GET", f"/v1/jobs/{job_id}")
@@ -3041,16 +3309,25 @@ class AsyncJobs:
     def __init__(self, transport: AsyncTransport) -> None:
         self._t = transport
 
-    async def create(self, *, schema_id: str, document_ids: list[str],
-                      include_provenance: bool | None = None) -> WithRateLimit[Any]:
-        return await self._t.request("POST", "/v1/jobs",
-                                       json=_create_body(schema_id=schema_id, document_ids=document_ids,
-                                                         include_provenance=include_provenance))
+    async def create(
+        self, *, schema_id: str, document_ids: list[str], include_provenance: bool | None = None
+    ) -> WithRateLimit[Any]:
+        return await self._t.request(
+            "POST",
+            "/v1/jobs",
+            json=_create_body(
+                schema_id=schema_id,
+                document_ids=document_ids,
+                include_provenance=include_provenance,
+            ),
+        )
 
-    async def list(self, *, status: str | None = None, limit: int | None = None,
-                   cursor: str | None = None) -> WithRateLimit[Any]:
-        return await self._t.request("GET", "/v1/jobs",
-                                       params=_list_params(status=status, limit=limit, cursor=cursor))
+    async def list(
+        self, *, status: str | None = None, limit: int | None = None, cursor: str | None = None
+    ) -> WithRateLimit[Any]:
+        return await self._t.request(
+            "GET", "/v1/jobs", params=_list_params(status=status, limit=limit, cursor=cursor)
+        )
 
     async def get(self, job_id: str) -> WithRateLimit[Any]:
         return await self._t.request("GET", f"/v1/jobs/{job_id}")
@@ -3115,10 +3392,15 @@ def test_extract_file_path_minimal(tmp_path):
     f = tmp_path / "i.pdf"
     f.write_bytes(b"%PDF-1.4\n%%EOF\n")
     route = respx.post("https://api.talonic.com/v1/extract").mock(
-        return_value=httpx.Response(200, json={"data": {"vendor_name": "Acme"}, "confidence": {"overall": 0.9}})
+        return_value=httpx.Response(
+            200, json={"data": {"vendor_name": "Acme"}, "confidence": {"overall": 0.9}}
+        )
     )
     c = Talonic(api_key="tlnc_x")
-    r = c.extract(file_path=str(f), schema={"type": "object", "properties": {"vendor_name": {"type": "string"}}})
+    r = c.extract(
+        file_path=str(f),
+        schema={"type": "object", "properties": {"vendor_name": {"type": "string"}}},
+    )
     assert r.data["data"]["vendor_name"] == "Acme"
     assert route.called
 
@@ -3154,21 +3436,29 @@ def test_extract_requires_schema_or_schema_id():
 def test_extract_auto_populates_required():
     """If properties is supplied but required is missing, fill it from keys."""
     from talonic.client import _normalize_schema  # private helper exercised
-    out = _normalize_schema({"type": "object", "properties": {"a": {"type": "string"}, "b": {"type": "number"}}})
+
+    out = _normalize_schema(
+        {"type": "object", "properties": {"a": {"type": "string"}, "b": {"type": "number"}}}
+    )
     assert out["required"] == ["a", "b"]
 
 
 def test_extract_two_file_sources_raises():
     with pytest.raises(ExtractInputError, match="exactly one"):
         Talonic(api_key="tlnc_x").extract(
-            file_path="/tmp/x", file_url="https://x", schema={"type": "object", "properties": {"x": {"type": "string"}}}
+            file_path="/tmp/x",
+            file_url="https://x",
+            schema={"type": "object", "properties": {"x": {"type": "string"}}},
         )
 
 
 @respx.mock
 def test_search():
     route = respx.get("https://api.talonic.com/v1/search").mock(
-        return_value=httpx.Response(200, json={"documents": [], "fieldMatches": [], "sources": [], "schemas": [], "fields": []})
+        return_value=httpx.Response(
+            200,
+            json={"documents": [], "fieldMatches": [], "sources": [], "schemas": [], "fields": []},
+        )
     )
     Talonic(api_key="tlnc_x").search("invoices", limit=5)
     q = dict(route.calls.last.request.url.params)
@@ -3183,12 +3473,16 @@ async def test_extract_async(tmp_path):
         return_value=httpx.Response(200, json={"data": {}, "confidence": {"overall": 1}})
     )
     async with AsyncTalonic(api_key="tlnc_x") as c:
-        await c.extract(file_path=str(f), schema={"type": "object", "properties": {"x": {"type": "string"}}})
+        await c.extract(
+            file_path=str(f), schema={"type": "object", "properties": {"x": {"type": "string"}}}
+        )
 
 
 @respx.mock
 async def test_search_async():
-    respx.get("https://api.talonic.com/v1/search").mock(return_value=httpx.Response(200, json={"documents": []}))
+    respx.get("https://api.talonic.com/v1/search").mock(
+        return_value=httpx.Response(200, json={"documents": []})
+    )
     async with AsyncTalonic(api_key="tlnc_x") as c:
         await c.search("x")
 ```
@@ -3235,10 +3529,16 @@ def _normalize_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 def _build_extract_body_or_multipart(
-    *, file_path: str | None, file_url: str | None, file_data: bytes | None,
-    filename: str | None, document_id: str | None,
-    schema: dict[str, Any] | None, schema_id: str | None,
-    include_markdown: bool, include_provenance: bool,
+    *,
+    file_path: str | None,
+    file_url: str | None,
+    file_data: bytes | None,
+    filename: str | None,
+    document_id: str | None,
+    schema: dict[str, Any] | None,
+    schema_id: str | None,
+    include_markdown: bool,
+    include_provenance: bool,
 ) -> tuple[dict[str, Any], dict[str, tuple[str, bytes, str]] | None, dict[str, Any] | None]:
     """Returns (json_body, files, form_data) appropriate for the chosen file source.
 
@@ -3246,24 +3546,37 @@ def _build_extract_body_or_multipart(
     For file_url / document_id → JSON body only.
     """
     source = normalize_extract_input(
-        file_data=file_data, filename=filename, file_path=file_path,
-        file_url=file_url, document_id=document_id,
+        file_data=file_data,
+        filename=filename,
+        file_path=file_path,
+        file_url=file_url,
+        document_id=document_id,
     )
     if schema is None and schema_id is None:
         raise ExtractInputError("extract() requires either a `schema` or `schema_id`.")
 
     base: dict[str, Any] = {}
-    if schema is not None: base["schema"] = _normalize_schema(schema)
-    if schema_id is not None: base["schema_id"] = schema_id
-    if include_markdown: base["include_markdown"] = True
-    if include_provenance: base["include_provenance"] = True
+    if schema is not None:
+        base["schema"] = _normalize_schema(schema)
+    if schema_id is not None:
+        base["schema_id"] = schema_id
+    if include_markdown:
+        base["include_markdown"] = True
+    if include_provenance:
+        base["include_provenance"] = True
 
     if "file_path" in source:
         path = Path(source["file_path"])
         files = {"file": (path.name, path.read_bytes(), _guess_content_type(path.name))}
         return ({}, files, {**base})
     if "file_data" in source:
-        files = {"file": (source["filename"], source["file_data"], _guess_content_type(source["filename"]))}
+        files = {
+            "file": (
+                source["filename"],
+                source["file_data"],
+                _guess_content_type(source["filename"]),
+            )
+        }
         return ({}, files, {**base})
     # URL / document_id → JSON body only.
     base.update(source)
@@ -3272,6 +3585,7 @@ def _build_extract_body_or_multipart(
 
 def _guess_content_type(filename: str) -> str:
     import mimetypes
+
     return mimetypes.guess_type(filename)[0] or "application/octet-stream"
 
 
@@ -3298,7 +3612,8 @@ class Talonic:
         self._transport.close()
 
     def extract(
-        self, *,
+        self,
+        *,
         file_path: str | os.PathLike[str] | None = None,
         file_url: str | None = None,
         file_data: bytes | None = None,
@@ -3311,9 +3626,14 @@ class Talonic:
     ) -> WithRateLimit[Any]:
         body, files, form = _build_extract_body_or_multipart(
             file_path=str(file_path) if file_path is not None else None,
-            file_url=file_url, file_data=file_data, filename=filename,
-            document_id=document_id, schema=schema, schema_id=schema_id,
-            include_markdown=include_markdown, include_provenance=include_provenance,
+            file_url=file_url,
+            file_data=file_data,
+            filename=filename,
+            document_id=document_id,
+            schema=schema,
+            schema_id=schema_id,
+            include_markdown=include_markdown,
+            include_provenance=include_provenance,
         )
         if files is not None:
             return self._transport.request("POST", "/v1/extract", files=files, data=form)
@@ -3321,7 +3641,8 @@ class Talonic:
 
     def search(self, query: str, *, limit: int | None = None) -> WithRateLimit[Any]:
         params: dict[str, Any] = {"query": query}
-        if limit is not None: params["limit"] = limit
+        if limit is not None:
+            params["limit"] = limit
         return self._transport.request("GET", "/v1/search", params=params)
 
 
@@ -3348,7 +3669,8 @@ class AsyncTalonic:
         await self._transport.aclose()
 
     async def extract(
-        self, *,
+        self,
+        *,
         file_path: str | os.PathLike[str] | None = None,
         file_url: str | None = None,
         file_data: bytes | None = None,
@@ -3361,9 +3683,14 @@ class AsyncTalonic:
     ) -> WithRateLimit[Any]:
         body, files, form = _build_extract_body_or_multipart(
             file_path=str(file_path) if file_path is not None else None,
-            file_url=file_url, file_data=file_data, filename=filename,
-            document_id=document_id, schema=schema, schema_id=schema_id,
-            include_markdown=include_markdown, include_provenance=include_provenance,
+            file_url=file_url,
+            file_data=file_data,
+            filename=filename,
+            document_id=document_id,
+            schema=schema,
+            schema_id=schema_id,
+            include_markdown=include_markdown,
+            include_provenance=include_provenance,
         )
         if files is not None:
             return await self._transport.request("POST", "/v1/extract", files=files, data=form)
@@ -3371,7 +3698,8 @@ class AsyncTalonic:
 
     async def search(self, query: str, *, limit: int | None = None) -> WithRateLimit[Any]:
         params: dict[str, Any] = {"query": query}
-        if limit is not None: params["limit"] = limit
+        if limit is not None:
+            params["limit"] = limit
         return await self._transport.request("GET", "/v1/search", params=params)
 ```
 
@@ -3398,11 +3726,20 @@ from talonic.errors import (
 
 __all__ = [
     "__version__",
-    "AsyncTalonic", "Talonic",
-    "CostInfo", "RateLimitInfo", "WithRateLimit",
+    "AsyncTalonic",
+    "Talonic",
+    "CostInfo",
+    "RateLimitInfo",
+    "WithRateLimit",
     "ExtractInputError",
-    "TalonicAuthError", "TalonicError", "TalonicNetworkError", "TalonicNotFoundError",
-    "TalonicRateLimitError", "TalonicServerError", "TalonicTimeoutError", "TalonicValidationError",
+    "TalonicAuthError",
+    "TalonicError",
+    "TalonicNetworkError",
+    "TalonicNotFoundError",
+    "TalonicRateLimitError",
+    "TalonicServerError",
+    "TalonicTimeoutError",
+    "TalonicValidationError",
 ]
 ```
 
@@ -3485,12 +3822,18 @@ def test_extract_file_url(monkeypatch):
     respx.post("https://api.talonic.com/v1/extract").mock(
         return_value=httpx.Response(200, json={"data": {"x": 1}, "confidence": {"overall": 1.0}})
     )
-    r = runner.invoke(app, [
-        "extract", "--file-url", "https://example.com/i.pdf",
-        "--schema", '{"type":"object","properties":{"x":{"type":"number"}},"required":["x"]}'
-    ])
+    r = runner.invoke(
+        app,
+        [
+            "extract",
+            "--file-url",
+            "https://example.com/i.pdf",
+            "--schema",
+            '{"type":"object","properties":{"x":{"type":"number"}},"required":["x"]}',
+        ],
+    )
     assert r.exit_code == 0
-    assert "\"x\": 1" in r.stdout
+    assert '"x": 1' in r.stdout
 
 
 @respx.mock
@@ -3527,7 +3870,9 @@ import typer
 from talonic import Talonic, __version__
 from talonic.errors import TalonicError
 
-app = typer.Typer(help="Talonic CLI — extract structured data from documents.", no_args_is_help=True)
+app = typer.Typer(
+    help="Talonic CLI — extract structured data from documents.", no_args_is_help=True
+)
 schemas_app = typer.Typer(help="Schema management")
 docs_app = typer.Typer(help="Document operations")
 extractions_app = typer.Typer(help="Extraction operations")
@@ -3649,8 +3994,11 @@ def extract(
     parsed_schema = json.loads(schema) if schema else None
     try:
         result = _client().extract(
-            file_path=file, file_url=file_url, document_id=document_id,
-            schema=parsed_schema, schema_id=schema_id,
+            file_path=file,
+            file_url=file_url,
+            document_id=document_id,
+            schema=parsed_schema,
+            schema_id=schema_id,
         )
     except TalonicError as exc:
         _fail(str(exc))
@@ -3660,7 +4008,9 @@ def extract(
 
 # === search ===
 @app.command()
-def search(query: str, limit: int = typer.Option(None), pretty: bool = typer.Option(False, "--pretty")) -> None:
+def search(
+    query: str, limit: int = typer.Option(None), pretty: bool = typer.Option(False, "--pretty")
+) -> None:
     _emit(_client().search(query, limit=limit).data, pretty=pretty)
 ```
 
@@ -3793,8 +4143,12 @@ Append to `tests/conftest.py`:
 
 ```python
 def pytest_addoption(parser):
-    parser.addoption("--live", action="store_true", default=False,
-                     help="Run tests marked `live` against api.talonic.com")
+    parser.addoption(
+        "--live",
+        action="store_true",
+        default=False,
+        help="Run tests marked `live` against api.talonic.com",
+    )
 
 
 def pytest_collection_modifyitems(config, items):
@@ -3864,16 +4218,16 @@ result = client.extract(
         "properties": {
             "vendor_name": {"type": "string"},
             "total_amount": {"type": "number"},
-            "due_date":     {"type": "string", "format": "date"},
+            "due_date": {"type": "string", "format": "date"},
         },
         "required": ["vendor_name", "total_amount"],
     },
 )
 
-print(result.data)              # {'vendor_name': 'Acme Corp', 'total_amount': 14250, 'due_date': '2026-03-15'}
-print(result.confidence.overall) # 0.97
-print(result.cost)               # CostInfo(cost_credits=12, cost_eur=0.024, ...)
-print(result.rate_limit)         # RateLimitInfo(limit=100, remaining=99, reset_at=…) | None
+print(result.data)  # {'vendor_name': 'Acme Corp', 'total_amount': 14250, 'due_date': '2026-03-15'}
+print(result.confidence.overall)  # 0.97
+print(result.cost)  # CostInfo(cost_credits=12, cost_eur=0.024, ...)
+print(result.rate_limit)  # RateLimitInfo(limit=100, remaining=99, reset_at=…) | None
 ```
 
 ## Async
@@ -3882,10 +4236,12 @@ print(result.rate_limit)         # RateLimitInfo(limit=100, remaining=99, reset_
 import asyncio
 from talonic import AsyncTalonic
 
+
 async def main():
     async with AsyncTalonic(api_key="tlnc_...") as client:
         result = await client.extract(file_path="./invoice.pdf", schema={...})
         print(result.data)
+
 
 asyncio.run(main())
 ```
@@ -3923,10 +4279,10 @@ The `talonic` binary name overlaps with `@talonic/node`'s CLI. If both are insta
 
 ```python
 client = Talonic(
-    api_key=...,                        # or TALONIC_API_KEY env
-    base_url="https://api.talonic.com", # default; or TALONIC_BASE_URL
-    timeout=60.0,                       # per-request seconds
-    max_retries=3,                      # 429/500-504/network/timeout
+    api_key=...,  # or TALONIC_API_KEY env
+    base_url="https://api.talonic.com",  # default; or TALONIC_BASE_URL
+    timeout=60.0,  # per-request seconds
+    max_retries=3,  # 429/500-504/network/timeout
 )
 ```
 
@@ -3934,8 +4290,14 @@ client = Talonic(
 
 ```python
 from talonic import (
-    TalonicError, TalonicAuthError, TalonicNotFoundError, TalonicValidationError,
-    TalonicRateLimitError, TalonicServerError, TalonicNetworkError, TalonicTimeoutError,
+    TalonicError,
+    TalonicAuthError,
+    TalonicNotFoundError,
+    TalonicValidationError,
+    TalonicRateLimitError,
+    TalonicServerError,
+    TalonicNetworkError,
+    TalonicTimeoutError,
 )
 
 try:
