@@ -208,18 +208,25 @@ Every error has `.status`, `.code`, `.request_id`, `.message`. Same shape as Nod
 ```python
 class BaseTransport:
     """Pure functions, no I/O."""
+
     def _build_headers(self, api_key: str) -> dict[str, str]: ...
     def _should_retry(self, status: int, attempt: int, body: dict | None) -> bool: ...
     def _backoff_delay(self, attempt: int) -> float: ...
     def _parse_rate_limit(self, headers) -> RateLimitInfo | None: ...
     def _parse_cost(self, headers) -> CostInfo | None: ...
 
+
 class SyncTransport(BaseTransport):
-    def __init__(self, config: TalonicConfig): self._client = httpx.Client(...)
+    def __init__(self, config: TalonicConfig):
+        self._client = httpx.Client(...)
+
     def request(self, method, path, **kwargs) -> WithRateLimit[Any]: ...
 
+
 class AsyncTransport(BaseTransport):
-    def __init__(self, config: TalonicConfig): self._client = httpx.AsyncClient(...)
+    def __init__(self, config: TalonicConfig):
+        self._client = httpx.AsyncClient(...)
+
     async def request(self, method, path, **kwargs) -> WithRateLimit[Any]: ...
 ```
 
@@ -394,6 +401,7 @@ async def docs(request, respx_mock):
     else:
         async with AsyncTalonic(api_key="tlnc_test") as client:
             yield client.documents, "async"
+
 
 async def test_list(docs, respx_mock):
     resource, flavor = docs

@@ -31,16 +31,16 @@ result = client.extract(
         "properties": {
             "vendor_name": {"type": "string"},
             "total_amount": {"type": "number"},
-            "due_date":     {"type": "string", "format": "date"},
+            "due_date": {"type": "string", "format": "date"},
         },
         "required": ["vendor_name", "total_amount"],
     },
 )
 
-print(result.data)              # {'vendor_name': 'Acme Corp', 'total_amount': 14250, 'due_date': '2026-03-15'}
-print(result.confidence.overall) # 0.97
-print(result.cost)               # CostInfo(cost_credits=12, cost_eur=0.024, ...)
-print(result.rate_limit)         # RateLimitInfo(limit=100, remaining=99, reset_at=…) | None
+print(result.data)  # {'vendor_name': 'Acme Corp', 'total_amount': 14250, 'due_date': '2026-03-15'}
+print(result.confidence.overall)  # 0.97
+print(result.cost)  # CostInfo(cost_credits=12, cost_eur=0.024, ...)
+print(result.rate_limit)  # RateLimitInfo(limit=100, remaining=99, reset_at=…) | None
 ```
 
 ## Async
@@ -49,10 +49,12 @@ print(result.rate_limit)         # RateLimitInfo(limit=100, remaining=99, reset_
 import asyncio
 from talonic import AsyncTalonic
 
+
 async def main():
     async with AsyncTalonic(api_key="tlnc_...") as client:
         result = await client.extract(file_path="./invoice.pdf", schema={...})
         print(result.data)
+
 
 asyncio.run(main())
 ```
@@ -90,10 +92,10 @@ The `talonic` binary name overlaps with `@talonic/node`'s CLI. If both are insta
 
 ```python
 client = Talonic(
-    api_key=...,                        # or TALONIC_API_KEY env
-    base_url="https://api.talonic.com", # default; or TALONIC_BASE_URL
-    timeout=60.0,                       # per-request seconds
-    max_retries=3,                      # 429/500-504/network/timeout
+    api_key=...,  # or TALONIC_API_KEY env
+    base_url="https://api.talonic.com",  # default; or TALONIC_BASE_URL
+    timeout=60.0,  # per-request seconds
+    max_retries=3,  # 429/500-504/network/timeout
 )
 ```
 
@@ -101,8 +103,14 @@ client = Talonic(
 
 ```python
 from talonic import (
-    TalonicError, TalonicAuthError, TalonicNotFoundError, TalonicValidationError,
-    TalonicRateLimitError, TalonicServerError, TalonicNetworkError, TalonicTimeoutError,
+    TalonicError,
+    TalonicAuthError,
+    TalonicNotFoundError,
+    TalonicValidationError,
+    TalonicRateLimitError,
+    TalonicServerError,
+    TalonicNetworkError,
+    TalonicTimeoutError,
 )
 
 try:
