@@ -10,6 +10,109 @@ from uuid import UUID
 from pydantic import AnyUrl, AwareDatetime, BaseModel, ConfigDict, Field, RootModel
 
 
+class OntologyDoctype(BaseModel):
+    key: str
+    name: str
+    category: str | None = None
+    maps_to: str | None = None
+    """
+    A Talonic ontology_type_id the doctype anchors to.
+    """
+    description: str | None = None
+    signals: list[str] | None = None
+
+
+class OntologyField(BaseModel):
+    key: str
+    canonical_name: str | None = None
+    display_name: str | None = None
+    data_type: str | None = None
+    description: str | None = None
+    synonyms: list[str] | None = None
+    doctype_scope: str | None = None
+    """
+    Custom doctype key, or null/empty/* for global.
+    """
+    required: bool | None = None
+    format: str | None = None
+    enum_values: list[str] | None = None
+    examples: list[str] | None = None
+
+
+class OntologyUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    doctypes: list[OntologyDoctype] | None = None
+    fields: list[OntologyField] | None = None
+
+
+class OntologyImport(BaseModel):
+    name: str
+    description: str | None = None
+    doctypes: list[OntologyDoctype] | None = None
+    fields: list[OntologyField] | None = None
+    publish: bool | None = None
+    """
+    Publish immediately after import.
+    """
+
+
+class Status(Enum):
+    pending = "pending"
+    running = "running"
+    step_extract = "step_extract"
+    step_structure = "step_structure"
+    step_reconcile = "step_reconcile"
+    completed = "completed"
+    failed = "failed"
+
+
+class Error(BaseModel):
+    """
+    Error detail (on failure).
+    """
+
+    step: str | None = None
+    error_code: str | None = None
+    message: str | None = None
+
+
+class RunResponse(BaseModel):
+    run_id: UUID | None = None
+    status: Status | None = None
+    config_id: str | None = None
+    batch_id: str | None = None
+    created_at: AwareDatetime | None = None
+    started_at: AwareDatetime | None = None
+    completed_at: AwareDatetime | None = None
+    duration_ms: int | None = None
+    current_step: str | None = None
+    markdown: str | None = None
+    """
+    OCR-converted markdown (on completion).
+    """
+    structured_data: dict[str, Any] | None = None
+    """
+    Structured extraction results (on completion).
+    """
+    reconciliation: dict[str, Any] | None = None
+    """
+    Reconciliation results (on completion).
+    """
+    error: Error | None = None
+    """
+    Error detail (on failure).
+    """
+
+
+class ConfigResponse(BaseModel):
+    config_id: str | None = Field(None, examples=["cfg_bridgeway_invoice_v1"])
+    name: str | None = None
+    description: str | None = None
+    credit_cost: int | None = None
+    steps: list[str] | None = Field(None, examples=[["extract", "structure", "reconcile"]])
+
+
 class ErrorResponse(BaseModel):
     status_code: int = Field(..., alias="statusCode", examples=[400])
     """
@@ -156,7 +259,7 @@ class DeletedResponse(BaseModel):
     id: UUID = Field(..., examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
 
 
-class Status(Enum):
+class Status1(Enum):
     complete = "complete"
 
 
@@ -202,17 +305,17 @@ class Links(BaseModel):
     dashboard: AnyUrl | None = None
 
 
-class Status1(Enum):
+class Status2(Enum):
     processing = "processing"
 
 
-class Status2(Enum):
+class Status3(Enum):
     queued = "queued"
 
 
 class Job(BaseModel):
     id: UUID = Field(..., examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
-    status: Status2 = Field(..., examples=["completed"])
+    status: Status3 = Field(..., examples=["completed"])
     poll_url: str = Field(..., examples=["/v1/jobs/abc-123"])
     """
     URL to poll for job progress.
@@ -227,6 +330,7 @@ class Document(BaseModel):
     id: UUID | None = Field(None, examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
     filename: str | None = Field(None, examples=["invoice-042.pdf"])
     pages: int | None = None
+    size_bytes: int | None = Field(None, examples=[148213])
 
 
 class Links1(BaseModel):
@@ -235,7 +339,7 @@ class Links1(BaseModel):
 
 class ExtractAsyncResponse(BaseModel):
     request_id: UUID = Field(..., examples=["req_x7y8z9a0b1c2d3e4"])
-    status: Status1 = Field(..., examples=["completed"])
+    status: Status2 = Field(..., examples=["completed"])
     job: Job
     document: Document
     links: Links1 | None = None
@@ -253,7 +357,7 @@ class ExtractDocumentSummary(BaseModel):
     language_detected: str | None = Field(None, examples=["en"])
 
 
-class Status3(Enum):
+class Status4(Enum):
     pending = "pending"
     processing = "processing"
     completed = "completed"
@@ -265,9 +369,64 @@ class Source(BaseModel):
     type: str | None = Field(None, examples=["manual"])
 
 
+class Sensitivity(Enum):
+    """
+    Sensitivity tier.
+    """
+
+    public = "public"
+    internal = "internal"
+    restricted = "restricted"
+    none_type_none = None
+
+
+class Triage(BaseModel):
+    """
+    Compliance triage signals for the document. `null` until triage has run.
+
+    """
+
+    sensitivity: Sensitivity | None = Field(None, examples=["internal"])
+    """
+    Sensitivity tier.
+    """
+    department: str | None = Field(None, examples=["finance"])
+    jurisdiction: str | None = Field(None, examples=["DE"])
+    """
+    Two-letter country code.
+    """
+    pii_detected: bool | None = Field(None, examples=[True])
+    """
+    True when at least one PII category was detected.
+    """
+    pii_categories: list[str] | None = Field(None, examples=[["name", "email"]])
+    """
+    Detected PII categories. `null` until the compliance pass has run.
+    """
+    regulated_data: bool | None = Field(None, examples=[False])
+    """
+    Whether the document likely contains regulated data.
+    """
+    confidentiality_marking: str | None = Field(None, examples=["Vertraulich"])
+    """
+    Confidentiality marking found in the document, if any.
+    """
+
+
+class ProcessingLogItem(BaseModel):
+    step: str = Field(..., examples=["ocr"])
+    status: str = Field(..., examples=["completed"])
+    started_at: AwareDatetime
+    completed_at: AwareDatetime | None = None
+    duration_ms: int | None = Field(None, examples=[3120])
+    detail: str | None = None
+
+
 class Links2(BaseModel):
     self: str | None = None
     extractions: str | None = None
+    fields: str | None = None
+    lineage: str | None = None
     dashboard: AnyUrl | None = None
 
 
@@ -279,17 +438,52 @@ class DocumentResponse(BaseModel):
     mime_type: str | None = Field(None, examples=["application/pdf"])
     type_detected: str | None = Field(None, examples=["Service Contract"])
     language_detected: str | None = Field(None, examples=["en"])
-    status: Status3 = Field(..., examples=["completed"])
+    status: Status4 = Field(..., examples=["completed"])
+    error: str | None = Field(None, examples=["Extraction failed"])
+    """
+    Human-readable failure message. Present ONLY when status is `error`; omitted otherwise.
+
+    """
     source: Source | None = None
+    field_count: int | None = Field(None, examples=[42])
+    """
+    Number of fields captured from the document. 0 until extraction completes.
+    """
+    triage: Triage | None = None
+    """
+    Compliance triage signals for the document. `null` until triage has run.
+
+    """
+    original_path: str | None = Field(None, examples=["/invoices/2026/04"])
+    """
+    Folder path of the file at its source, when ingested from a connector.
+    """
+    batch_id: str | None = Field(None, examples=["2026-07-14-run-042"])
+    """
+    Caller grouping key supplied at ingest (batch_id). Present ONLY when the document was tagged; omitted otherwise (backwards-compatible).
+
+    """
+    metadata: dict[str, str | float | bool | None] | None = Field(
+        None, examples=[{"customer": "bridgeway", "source": "sftp"}]
+    )
+    """
+    Caller flat metadata supplied at ingest. Present ONLY when the document was tagged; omitted otherwise (backwards-compatible).
+
+    """
     extraction_count: int | None = Field(None, examples=[1])
     latest_extraction_id: UUID | None = Field(
         None, examples=["d1a2b3c4-5678-9abc-def0-1234567890ab"]
     )
+    processing_log: list[ProcessingLogItem] | None = None
+    """
+    Per-stage pipeline timing log (OCR, classify, extract). Present ONLY when at least one stage has been recorded; omitted otherwise.
+
+    """
     created_at: AwareDatetime = Field(..., examples=["2026-04-25T14:30:00.000Z"])
     links: Links2 | None = None
 
 
-class Status4(Enum):
+class Status5(Enum):
     complete = "complete"
     failed = "failed"
     processing = "processing"
@@ -302,7 +496,7 @@ class Links3(BaseModel):
 
 class ExtractionListItem(BaseModel):
     id: UUID | None = Field(None, examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
-    status: Status4 | None = Field(None, examples=["completed"])
+    status: Status5 | None = Field(None, examples=["completed"])
     document_id: UUID | None = Field(None, examples=["f0e1d2c3-b4a5-9687-8765-432109876543"])
     document_filename: str | None = Field(None, examples=["invoice-042.pdf"])
     confidence_overall: float | None = None
@@ -337,7 +531,7 @@ class Links4(BaseModel):
 
 class ExtractionResponse(BaseModel):
     id: UUID = Field(..., examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
-    status: Status4 = Field(..., examples=["completed"])
+    status: Status5 = Field(..., examples=["completed"])
     document: Document1
     data: dict[str, Any]
     """
@@ -347,6 +541,16 @@ class ExtractionResponse(BaseModel):
     locked_fields: list[str] | None = None
     """
     Fields that have been manually corrected (locked at confidence 1.0).
+    """
+    batch_id: str | None = None
+    """
+    The caller grouping key stamped on this document at ingestion (documents.client_batch_id) — e.g. from POST /v1/run or POST /v1/sources/:id/documents. Present only when set.
+
+    """
+    metadata: dict[str, Any] | None = None
+    """
+    The caller's flat metadata bag stamped on this document at ingestion (documents.client_metadata) — for a /v1/run input, its per-request EFFECTIVE merged bag (call-level metadata merged with any file_metadata entry). Present only when set.
+
     """
     processing: Processing1 | None = None
     created_at: AwareDatetime | None = Field(None, examples=["2026-04-25T14:30:00.000Z"])
@@ -369,8 +573,10 @@ class Definition(BaseModel):
     required: list[str] | None = None
 
 
-class Links5(Links2):
-    pass
+class Links5(BaseModel):
+    self: str | None = None
+    extractions: str | None = None
+    dashboard: AnyUrl | None = None
 
 
 class SchemaResponse(BaseModel):
@@ -476,7 +682,7 @@ class SchemaUpdateRequest(BaseModel):
     """
 
 
-class Status6(Enum):
+class Status7(Enum):
     pending = "pending"
     queued = "queued"
     processing = "processing"
@@ -515,7 +721,7 @@ class CurrentPhase(Enum):
     error = "error"
 
 
-class Error(BaseModel):
+class Error1(BaseModel):
     """
     Present only when status is `failed`.
     """
@@ -536,7 +742,7 @@ class Links6(BaseModel):
 class JobResponse(BaseModel):
     id: UUID = Field(..., examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
     name: str | None = Field(None, examples=["Q1 Invoice Processing"])
-    status: Status6 = Field(..., examples=["completed"])
+    status: Status7 = Field(..., examples=["completed"])
     progress: int | None = Field(None, examples=[45])
     """
     Percentage complete (0–100). Only present while `processing`.
@@ -559,7 +765,7 @@ class JobResponse(BaseModel):
     """
     Current pipeline phase.
     """
-    error: Error | None = None
+    error: Error1 | None = None
     """
     Present only when status is `failed`.
     """
@@ -569,7 +775,7 @@ class JobResponse(BaseModel):
     links: Links6 | None = None
 
 
-class Status7(Enum):
+class Status8(Enum):
     active = "active"
     syncing = "syncing"
     error = "error"
@@ -589,7 +795,7 @@ class SourceResponse(BaseModel):
     id: UUID = Field(..., examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
     name: str = Field(..., examples=["Invoices Ingest"])
     type: str = Field(..., examples=["api"])
-    status: Status7 = Field(..., examples=["completed"])
+    status: Status8 = Field(..., examples=["completed"])
     document_count: int | None = Field(None, examples=[42])
     default_schema: DefaultSchema | None = None
     endpoint: str | None = Field(None, examples=["/v1/sources/abc-123/documents"])
@@ -619,7 +825,7 @@ class SourceUpdateRequest(BaseModel):
     """
 
 
-class Status8(Enum):
+class Status9(Enum):
     """
     `queued` if the document was accepted, `duplicate` if a matching file already exists.
     """
@@ -636,10 +842,17 @@ class Links8(BaseModel):
 class IngestDocumentResponse(BaseModel):
     document_id: UUID | None = Field(None, examples=["f0e1d2c3-b4a5-9687-8765-432109876543"])
     """
-    ID of the created document (absent if duplicate).
+    ID of the created document. When status is `duplicate`, this is the id of the linked-duplicate row created for this upload (see `existing_document_id` for the canonical document).
     """
     filename: str | None = Field(None, examples=["invoice-042.pdf"])
-    status: Status8 | None = Field(None, examples=["completed"])
+    """
+    The uploaded file's own name — present on both the `queued` and `duplicate` branches.
+    """
+    size_bytes: int | None = Field(None, examples=[148213])
+    """
+    The uploaded file's own size in bytes — present on both the `queued` and `duplicate` branches.
+    """
+    status: Status9 | None = Field(None, examples=["completed"])
     """
     `queued` if the document was accepted, `duplicate` if a matching file already exists.
     """
@@ -652,7 +865,7 @@ class IngestDocumentResponse(BaseModel):
         None, examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"]
     )
     """
-    Present when status is `duplicate`.
+    Present when status is `duplicate` — the canonical document this upload deduplicated to (the linked duplicate reads its extracted data from it). The `document_id` field carries the id of the linked-duplicate row created for this upload.
     """
     links: Links8 | None = None
 
@@ -664,7 +877,7 @@ class Links9(BaseModel):
 class SourceDocumentItem(BaseModel):
     id: UUID | None = Field(None, examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
     filename: str | None = Field(None, examples=["invoice-042.pdf"])
-    status: Status3 | None = Field(None, examples=["completed"])
+    status: Status4 | None = Field(None, examples=["completed"])
     size_bytes: int | None = None
     type_detected: str | None = None
     created_at: AwareDatetime | None = Field(None, examples=["2026-04-25T14:30:00.000Z"])
@@ -688,7 +901,7 @@ class JobCreateRequest(BaseModel):
     """
 
 
-class Status10(Enum):
+class Status11(Enum):
     """
     The job always starts in `pending` state.
     """
@@ -706,7 +919,7 @@ class JobCreateResponse(BaseModel):
     """
     The newly created job's UUID.
     """
-    status: Status10 = Field(..., examples=["completed"])
+    status: Status11 = Field(..., examples=["completed"])
     """
     The job always starts in `pending` state.
     """
@@ -977,7 +1190,7 @@ class MatchingConfigUpdateRequest(BaseModel):
     target_value: dict[str, Any] | None = None
 
 
-class Status11(Enum):
+class Status12(Enum):
     queued = "queued"
     running = "running"
     completed = "completed"
@@ -993,7 +1206,7 @@ class Links14(BaseModel):
 class MatchingRunResponse(BaseModel):
     id: UUID = Field(..., examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
     matching_config_id: UUID = Field(..., examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
-    status: Status11 = Field(..., examples=["completed"])
+    status: Status12 = Field(..., examples=["completed"])
     triggered_by: str | None = Field(None, examples=["manual"])
     rows_processed: int | None = None
     rows_matched: int | None = None
@@ -1249,6 +1462,11 @@ class DeliveryBinding(BaseModel):
     Must resolve to a registered serializer (json, ndjson, csv, csv_file, xlsx, rows, graph, raw, md, txt).
     """
     serializer_config: dict[str, Any] | None = None
+    resolver_config: dict[str, Any] | None = None
+    """
+    Per-binding resolver options threaded into the deliverable resolver. First consumer: `null_handling` on the `pipeline.capture` deliverable — `always_null` (default: every declared schema field present, missing values as null), `omit_absent` (valued fields only), or `distinguish` (null = deliberately cleared by resolution; never-captured keys omitted). The sparse modes require a json or ndjson serializer (compatibility validated on create/update).
+
+    """
     delivery_policy: DeliveryPolicy | None = None
     is_active: bool
     last_status: str | None = None
@@ -1264,6 +1482,11 @@ class CreateBindingRequest(BaseModel):
     field_map: FieldMap | None = None
     serializer_format: str
     serializer_config: dict[str, Any] | None = None
+    resolver_config: dict[str, Any] | None = None
+    """
+    Per-binding resolver options — e.g. `{"null_handling": "distinguish"}` on a `pipeline.capture` binding. Sparse modes (`omit_absent`, `distinguish`) require a json/ndjson serializer (400 otherwise).
+
+    """
     delivery_policy: DeliveryPolicy | None = None
     is_active: bool | None = None
 
@@ -1280,11 +1503,16 @@ class UpdateBindingRequest(BaseModel):
     field_map: FieldMap | None = None
     serializer_format: str | None = None
     serializer_config: dict[str, Any] | None = None
+    resolver_config: dict[str, Any] | None = None
+    """
+    Per-binding resolver options — e.g. `{"null_handling": "distinguish"}` on a `pipeline.capture` binding. Sparse modes (`omit_absent`, `distinguish`) require a json/ndjson serializer (400 otherwise).
+
+    """
     delivery_policy: DeliveryPolicy | None = None
     is_active: bool | None = None
 
 
-class Status12(Enum):
+class Status13(Enum):
     in_flight = "in_flight"
     succeeded = "succeeded"
     failed = "failed"
@@ -1306,7 +1534,7 @@ class DeliveryItem(BaseModel):
     """
     SHA-256-derived key passed on the wire. Stable within an attempt.
     """
-    status: Status12 = Field(..., examples=["completed"])
+    status: Status13 = Field(..., examples=["completed"])
     attempt: int = Field(..., ge=1)
     http_status: int | None = None
     error_code: str | None = None
@@ -2159,7 +2387,7 @@ class BenchmarkResultItem(BaseModel):
     created_at: AwareDatetime | None = Field(None, examples=["2026-04-25T14:30:00.000Z"])
 
 
-class Status13(Enum):
+class Status14(Enum):
     accumulating = "accumulating"
     submitted = "submitted"
     in_progress = "in_progress"
@@ -2179,7 +2407,7 @@ class Links20(Links9):
 
 class BatchResponse(BaseModel):
     id: UUID = Field(..., examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
-    status: Status13 = Field(..., examples=["completed"])
+    status: Status14 = Field(..., examples=["completed"])
     provider: Provider = Field(..., examples=["anthropic"])
     item_count: int
     succeeded_count: int
@@ -2209,11 +2437,14 @@ class BatchDetailResponse(BatchResponse):
 
 
 class CaseListItem(BaseModel):
-    id: str
+    id: UUID
     """
-    Case key (same value as `case_key`).
+    Case UUID — the stable resource id used in API paths.
     """
-    case_key: str = Field(..., examples=["7a3f2b1c"], pattern="^[a-fA-F0-9]{8,64}$")
+    case_key: str = Field(..., examples=["8c1ca050535e3ea3"], pattern="^[a-fA-F0-9]{8,64}$")
+    """
+    Content-derived key (hex hash of the member document set); distinct from `id`.
+    """
     label: str | None
     document_count: int
     created_at: AwareDatetime | None = Field(None, examples=["2026-04-25T14:30:00.000Z"])
@@ -2233,8 +2464,14 @@ class Links22(BaseModel):
 
 
 class CaseDetailResponse(BaseModel):
-    id: str
-    case_key: str = Field(..., examples=["7a3f2b1c"])
+    id: UUID
+    """
+    Case UUID — the stable resource id used in API paths.
+    """
+    case_key: str = Field(..., examples=["8c1ca050535e3ea3"])
+    """
+    Content-derived key (hex hash of the member document set); distinct from `id`.
+    """
     label: str | None = None
     narrative: str | None = None
     documents: list[Document2]
@@ -2264,7 +2501,10 @@ class Links24(BaseModel):
 class FieldResponse(BaseModel):
     id: UUID = Field(..., examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
     canonical_name: str = Field(..., examples=["invoice_number"])
-    display_name: str | None = None
+    display_name: str = Field(..., examples=["Invoice Number"])
+    """
+    Human-readable label, always present. A stored display name wins; otherwise it is derived from `canonical_name`, e.g. `invoice_number` → `Invoice Number`.
+    """
     data_type: str = Field(..., examples=["string"])
     tier: int
     cluster_name: str | None = None
@@ -2336,16 +2576,49 @@ class Period(BaseModel):
 
 class Totals(BaseModel):
     input_tokens: int
+    """
+    Uncached input tokens (cached tokens are reported separately).
+    """
     output_tokens: int
+    cache_read_tokens: int
+    """
+    Tokens served from the provider's prompt cache.
+    """
+    cache_creation_tokens: int
+    """
+    Tokens written to the provider's prompt cache (Anthropic only; 0 for other providers).
+    """
     calls: int
 
 
 class BreakdownItem(BaseModel):
     operation_type: str
-    model: str
+    model: str | None = None
+    """
+    Omitted for organizations without the "Cost control endpoints" approval (see `cost_fields` on the parent response).
+    """
     input_tokens: int
+    """
+    Uncached input tokens (cached tokens are reported separately).
+    """
     output_tokens: int
+    cache_read_tokens: int
+    """
+    Tokens served from the provider's prompt cache.
+    """
+    cache_creation_tokens: int
+    """
+    Tokens written to the provider's prompt cache (Anthropic only; 0 for other providers).
+    """
     calls: int
+
+
+class CostFields(Enum):
+    """
+    Present and set to `"redacted"` only for organizations without the "Cost control endpoints" approval — signals that `breakdown[].model` has been omitted. Absent for approved organizations.
+    """
+
+    redacted = "redacted"
 
 
 class Links27(Links9):
@@ -2356,25 +2629,64 @@ class UsageResponse(BaseModel):
     period: Period
     totals: Totals
     breakdown: list[BreakdownItem]
+    cost_fields: CostFields | None = None
+    """
+    Present and set to `"redacted"` only for organizations without the "Cost control endpoints" approval — signals that `breakdown[].model` has been omitted. Absent for approved organizations.
+    """
     links: Links27
 
 
 class Totals1(BaseModel):
     input_tokens: int
+    """
+    Uncached input tokens (cached tokens are reported separately).
+    """
     output_tokens: int
-    cost_estimate_usd: float
+    cache_read_tokens: int
+    """
+    Tokens served from the provider's prompt cache.
+    """
+    cache_creation_tokens: int
+    """
+    Tokens written to the provider's prompt cache (Anthropic only; 0 for other providers).
+    """
+    cost_estimate_usd: float | None = None
+    """
+    Omitted for organizations without the "Cost control endpoints" approval (see `cost_fields` on the parent response).
+    """
     calls: int
 
 
 class Entry(BaseModel):
     id: str
     operation_type: str
-    model: str
+    model: str | None = None
+    """
+    Omitted for organizations without the "Cost control endpoints" approval.
+    """
     input_tokens: int
     output_tokens: int
-    cache_read_tokens: int | None = None
+    cache_read_tokens: int | None
+    """
+    Tokens served from the provider's prompt cache.
+    """
+    cache_creation_tokens: int
+    """
+    Tokens written to the provider's prompt cache (Anthropic only; 0 for other providers).
+    """
     cost_estimate_usd: float | None = None
+    """
+    Omitted for organizations without the "Cost control endpoints" approval.
+    """
     created_at: AwareDatetime = Field(..., examples=["2026-04-25T14:30:00.000Z"])
+
+
+class CostFields1(Enum):
+    """
+    Present and set to `"redacted"` only for organizations without the "Cost control endpoints" approval — signals that `model` and all `cost_estimate_usd` fields have been omitted. Absent for approved organizations.
+    """
+
+    redacted = "redacted"
 
 
 class Links28(Links3):
@@ -2385,28 +2697,413 @@ class DocumentUsageResponse(BaseModel):
     document_id: UUID = Field(..., examples=["f0e1d2c3-b4a5-9687-8765-432109876543"])
     totals: Totals1
     entries: list[Entry]
+    cost_fields: CostFields1 | None = None
+    """
+    Present and set to `"redacted"` only for organizations without the "Cost control endpoints" approval — signals that `model` and all `cost_estimate_usd` fields have been omitted. Absent for approved organizations.
+    """
     links: Links28
 
 
-class Status14(Enum):
+class Scope(Enum):
+    """
+    Fixed code identifying the attribution rule applied to this response.
+    """
+
+    pipeline_calls_only = "pipeline_calls_only"
+
+
+class Totals2(BaseModel):
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
+    cache_creation_tokens: int
+    """
+    Cache-write tokens, billed at 1.25× the fresh input rate.
+    """
+    calls: int
+    cost_estimate_usd: float
+
+
+class BreakdownItem1(BaseModel):
+    operation_type: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
+    cache_creation_tokens: int
+    calls: int
+    cost_estimate_usd: float
+
+
+class Document3(BaseModel):
+    document_id: UUID
+    filename: str | None
+    """
+    The document's filename, or null if it could not be resolved.
+    """
+    input_tokens: int
+    output_tokens: int
+    calls: int
+    cost_estimate_usd: float
+
+
+class Links29(BaseModel):
+    self: str | None = None
+    pipeline: str | None = None
+
+
+class PipelineUsageResponse(BaseModel):
+    pipeline_id: UUID = Field(..., examples=["b3c4d5e6-f7a8-9012-bcde-f34567890123"])
+    period: Period
+    scope: Scope
+    """
+    Fixed code identifying the attribution rule applied to this response.
+    """
+    scope_note: str = Field(
+        ...,
+        examples=[
+            "Calls stamped with this pipeline id in call metadata. The shared ingest OCR leg is excluded."
+        ],
+    )
+    """
+    Human-readable statement of what this response covers — pipeline-stamped calls only. The ingest OCR leg (shared across runs) is excluded by design.
+    """
+    totals: Totals2
+    breakdown: list[BreakdownItem1]
+    documents: list[Document3]
+    """
+    Per-document rollup of the same pipeline-stamped calls.
+    """
+    links: Links29
+
+
+class Scope1(Enum):
+    """
+    Fixed code identifying the attribution rule applied to this response.
+    """
+
+    run_attributed_calls = "run_attributed_calls"
+
+
+class Document4(BaseModel):
+    document_id: UUID
+    filename: str | None = None
+    """
+    The document's filename. Omitted entirely (not merely null) on the zero-totals placeholder rows returned for a still-ingesting/pre-pipeline or legacy echo-less run.
+    """
+    input_tokens: int
+    output_tokens: int
+    calls: int
+    cost_estimate_usd: float
+
+
+class Links30(BaseModel):
+    self: str | None = None
+    run: str | None = None
+
+
+class RunUsageResponse(BaseModel):
+    run_id: UUID = Field(..., examples=["c4d5e6f7-a8b9-0123-cdef-456789012345"])
+    pipeline_id: UUID | None
+    """
+    Null while the run is still ingesting or if it failed before a pipeline was created — the response still returns `200` with zero totals in that case, never `404`.
+    """
+    period: Period
+    scope: Scope1
+    """
+    Fixed code identifying the attribution rule applied to this response.
+    """
+    scope_note: str = Field(
+        ...,
+        examples=[
+            "Calls stamped with the run's pipeline id, restricted to the run's own documents and lifetime. Approximate under shared-pipeline concurrency (append mode); the shared ingest OCR leg is excluded."
+        ],
+    )
+    """
+    Human-readable statement of attribution: pipeline-stamped calls, limited to the run's own documents and active time window. Documented as approximate under shared-pipeline concurrency (append mode / several runs on one pipeline); a document skipped by dedup or extraction-reuse legitimately reports zeros. Explains the zero-totals case (still-ingesting/pre-pipeline run, or a legacy run predating per-request document tracking) when applicable.
+    """
+    totals: Totals2
+    breakdown: list[BreakdownItem1]
+    documents: list[Document4]
+    """
+    Per-document rollup, one row per entry in the run's own `documents[]` echo. A document skipped by dedup or extraction-reuse legitimately appears with all-zero counts.
+    """
+    links: Links30
+
+
+class ResultsColumn(BaseModel):
+    field_key: str
+    """
+    Stable machine key. Rows in `data` are keyed by this, never by the label.
+    """
+    display_name: str
+    """
+    Human-readable column label, always present. A stored display name (a Spec field's title or a minted registry display name) wins; otherwise it is derived from `field_key`, e.g. `charge_type` → `Charge Type`.
+    """
+    data_type: str
+
+
+class ResultsCell(BaseModel):
+    value: Any
+    """
+    The cell's coalesced value; null for a held (pending_approval) cell. A structured-subschema cell is emitted TYPED — each object's subfields projected to their declared subfield data_type, matching json/ndjson delivery and the run.completed webhook. A number/boolean subfield parse-miss serializes null (no string wire form); an enum/date miss and any nested array/object subfield value pass through raw.
+    """
+    status: str = Field(..., examples=["filled"])
+    confidence: float | None
+    source: str | None
+    """
+    Opaque-but-stable cell-source vocabulary (e.g. llm_extraction, field_registry, pipeline_resolution, pipeline_assembly, pipeline_assembly_anchor, human_review, auto_adjudication, review_gate). New values may appear over time; existing values do not rename.
+    """
+    document_id: UUID | None
+    """
+    On a composed row, the cell's real source document — may differ from the record's anchor document_id.
+    """
+    filename: str | None
+
+
+class Kind8(Enum):
+    """
+    legacy covers the internal legacy_unvalidated kind plus any unparseable/unknown envelope.
+    """
+
+    span = "span"
+    assembly_override = "assembly_override"
+    auto_adjudication = "auto_adjudication"
+    human = "human"
+    derived = "derived"
+    legacy = "legacy"
+
+
+class ResultsProvenance(BaseModel):
+    kind: Kind8
+    """
+    legacy covers the internal legacy_unvalidated kind plus any unparseable/unknown envelope.
+    """
+    text: str | None = None
+    """
+    The winning value's genesis span text. Absent for a held cell (kind-only redaction) and never a displaced/previous value even when unheld.
+    """
+    derived_reason: str | None = None
+    """
+    Open enum; documented values today include inferred_no_span, source_text_unlocated, inferred_absence, customer_injected, resolved_default. Consumers must tolerate new values.
+    """
+    source_document_id: UUID | None = None
+    page_index: int | None = None
+
+
+class ResultsAuditVersion(BaseModel):
+    version: int | None
+    value: Any
+    """
+    Redacted (null) for EVERY version in a field's trail when that field's LATEST version is held — the hold mechanism copies the held value forward, making the prior version an equal leak. Serializes normally once the hold resolves. This audit trail is the deliberate RAW history view — structured-subschema subfields are NOT type-projected here (unlike fields and cells[].value).
+    """
+    status: str | None
+    source: str | None
+    confidence: float | None
+    created_at: AwareDatetime | None
+
+
+class Status15(Enum):
+    """
+    Folded from ~10 internal pipeline_documents states. Deliberately keeps partial (unlike GET /v1/run/{id}'s documents[].status, which folds partial into completed).
+    """
+
+    complete = "complete"
+    partial = "partial"
+    error = "error"
+    processing = "processing"
+
+
+class ResultsRecord(BaseModel):
+    document_id: UUID | None
+    """
+    Null only for an anchor-less composed row (the product record's anchor could not be resolved).
+    """
+    filename: str | None
+    run_id: UUID | None
+    """
+    The attributed /v1/run request id (echo containment, newest-for-pipeline fallback restricted to echo-less legacy rows); null for a UI or POST /v1/pipelines run.
+    """
+    pipeline_id: UUID
+    record_id: str
+    """
+    The row's record identity — the pipeline_document id on the main set, the product record id on the composed set.
+    """
+    status: Status15
+    """
+    Folded from ~10 internal pipeline_documents states. Deliberately keeps partial (unlike GET /v1/run/{id}'s documents[].status, which folds partial into completed).
+    """
+    completed_at: AwareDatetime | None
+    """
+    COALESCE of the last per-phase completion stamp. Tracks document PROCESSING completion, not value change — a review promotion or assembly recompose never advances it, and a phase rerun nulls it until the document re-processes.
+    """
+    metadata: dict[str, Any] | None = None
+    """
+    Caller tags; present only when set.
+    """
+    batch_id: str | None = None
+    """
+    Present only when set.
+    """
+    fields: dict[str, Any]
+    """
+    field_key -> clean value. Held (pending_approval) fields serialize null; demoted fields and __ diagnostics are absent. A structured-subschema field is emitted TYPED (subfields projected to their declared data_type; number/boolean parse-miss -> null, enum/date miss and nested values -> raw), matching the cells[].value projection and the run.completed webhook.
+    """
+    cells: dict[str, ResultsCell] | None = None
+    """
+    Present only when include=cells. Keyed by field_key.
+    """
+    provenance: dict[str, ResultsProvenance] | None = None
+    """
+    Present only when include=provenance. Keyed by field_key.
+    """
+    audit: dict[str, list[ResultsAuditVersion]] | None = None
+    """
+    Present only when include=audit. Keyed by field_key; the cell-version trail.
+    """
+
+
+class ResultsPagination(BaseModel):
+    total: int
+    limit: int
+    has_more: bool
+    next_cursor: str | None
+    """
+    Opaque cursor keyed on record_id. Stable under concurrent appends.
+    """
+
+
+class View(Enum):
+    composed = "composed"
+    documents = "documents"
+
+
+class Links31(BaseModel):
+    self: str
+    pipeline: str
+    progress: str
+
+
+class PipelineResultsResponse(BaseModel):
+    pipeline_id: UUID
+    spec_id: UUID
+    """
+    pipeline.schema_id — the Spec this run compiled from.
+    """
+    status: str
+    """
+    The pipeline's own lifecycle status. Never settles for an append pipeline that keeps receiving requests.
+    """
+    view: View
+    generated_at: AwareDatetime
+    columns: list[ResultsColumn]
+    data: list[ResultsRecord]
+    pagination: ResultsPagination
+    pending_review_count: int
+    """
+    Held cells in the current page's records only.
+    """
+    scope_note: str | None = None
+    """
+    Present only for the echo-less legacy run_id zero-state — a 200 empty page, never a guess.
+    """
+    links: Links31
+
+
+class Status16(Enum):
+    """
+    The folded public run status (same vocabulary as GET /v1/run/{id}) — settles even for an append pipeline that never settles at the pipeline level.
+    """
+
+    processing = "processing"
+    completed = "completed"
+    failed = "failed"
+
+
+class View1(Enum):
+    """
+    Always documents on this route.
+    """
+
+    documents = "documents"
+
+
+class Links32(BaseModel):
+    self: str
+    run: str
+    composed_results: str | None = None
+    """
+    Present only when a pipeline exists — GET /v1/pipelines/{id}/results, where an assembly run's composed rows actually live.
+    """
+
+
+class RunResultsResponse(BaseModel):
+    run_id: UUID
+    pipeline_id: UUID | None
+    """
+    Null while the run has no compiled pipeline yet.
+    """
+    spec_id: UUID
+    status: Status16
+    """
+    The folded public run status (same vocabulary as GET /v1/run/{id}) — settles even for an append pipeline that never settles at the pipeline level.
+    """
+    view: View1
+    """
+    Always documents on this route.
+    """
+    generated_at: AwareDatetime
+    columns: list[ResultsColumn]
+    data: list[ResultsRecord]
+    pagination: ResultsPagination
+    pending_review_count: int
+    scope_note: str | None = None
+    """
+    Present only for the two zero-states — no pipeline yet, or an echo-less legacy run.
+    """
+    links: Links32
+
+
+class Error2(Enum):
+    bad_request = "bad_request"
+
+
+class Code(Enum):
+    invalid_view = "invalid_view"
+    invalid_document_ids = "invalid_document_ids"
+    invalid_run_id = "invalid_run_id"
+    invalid_time_range = "invalid_time_range"
+    invalid_status = "invalid_status"
+    invalid_include = "invalid_include"
+    unsupported_filter = "unsupported_filter"
+    audit_include_too_broad = "audit_include_too_broad"
+
+
+class ResultsBadRequestError(BaseModel):
+    error: Error2
+    code: Code
+    message: str
+
+
+class Status17(Enum):
     pending = "pending"
     running = "running"
     completed = "completed"
     failed = "failed"
 
 
-class Links29(Links19):
+class Links33(Links19):
     pass
 
 
 class ResolutionResponse(BaseModel):
     id: UUID = Field(..., examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
     source_run_id: UUID | None = Field(None, examples=["f2a3b4c5-d6e7-8901-fabc-012345678901"])
-    status: Status14 = Field(..., examples=["completed"])
+    status: Status17 = Field(..., examples=["completed"])
     documents_processed: int | None = None
     created_at: AwareDatetime = Field(..., examples=["2026-04-25T14:30:00.000Z"])
     completed_at: AwareDatetime | None = Field(None, examples=["2026-04-25T14:30:00.000Z"])
-    links: Links29
+    links: Links33
 
 
 class Category(Enum):
@@ -2425,7 +3122,7 @@ class LinkKeyResponse(BaseModel):
     """
 
 
-class Links30(BaseModel):
+class Links34(BaseModel):
     self: str | None = None
     versions: str | None = None
 
@@ -2438,10 +3135,10 @@ class SchemaGraphClassResponse(BaseModel):
     field_count: int
     created_at: AwareDatetime | None = Field(None, examples=["2026-04-25T14:30:00.000Z"])
     updated_at: AwareDatetime | None = Field(None, examples=["2026-04-25T14:30:00.000Z"])
-    links: Links30
+    links: Links34
 
 
-class Status15(Enum):
+class Status18(Enum):
     pending = "pending"
     approved = "approved"
     rejected = "rejected"
@@ -2452,7 +3149,7 @@ class SchemaGraphDiffResponse(BaseModel):
     class_id: UUID = Field(..., examples=["a7b8c9d0-e1f2-3456-abcd-567890123456"])
     from_version: int | None = None
     to_version: int | None = None
-    status: Status15 = Field(..., examples=["completed"])
+    status: Status18 = Field(..., examples=["completed"])
     changes: list[dict[str, Any]] | None = None
     """
     List of field additions, removals, and modifications.
@@ -2508,20 +3205,20 @@ class StructuringGateCreateRequest(BaseModel):
     schema_id: UUID | None = Field(None, examples=["b2c3d4e5-f6a7-8901-bcde-f12345678901"])
 
 
-class Links31(Links9):
+class Links35(Links9):
     pass
 
 
-class GoldenSampleResponse(BaseModel):
+class GroundTruthResponse(BaseModel):
     id: UUID = Field(..., examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
     name: str
     description: str | None = None
     sample_count: int | None = None
     created_at: AwareDatetime = Field(..., examples=["2026-04-25T14:30:00.000Z"])
-    links: Links31 | None = None
+    links: Links35 | None = None
 
 
-class Links32(Links19):
+class Links36(Links19):
     pass
 
 
@@ -2529,18 +3226,137 @@ class ValidationRunResponse(BaseModel):
     id: UUID = Field(..., examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
     golden_sample_id: UUID | None = Field(None, examples=["e5f6a7b8-c9d0-1234-efab-345678901234"])
     schema_id: UUID | None = Field(None, examples=["b2c3d4e5-f6a7-8901-bcde-f12345678901"])
-    status: Status14 = Field(..., examples=["completed"])
+    status: Status17 = Field(..., examples=["completed"])
     accuracy_overall: float | None = None
     documents_processed: int | None = None
     created_at: AwareDatetime = Field(..., examples=["2026-04-25T14:30:00.000Z"])
     completed_at: AwareDatetime | None = Field(None, examples=["2026-04-25T14:30:00.000Z"])
-    links: Links32 | None = None
+    links: Links36 | None = None
+
+
+class Pagination1(BaseModel):
+    next_cursor: str | None = None
+    has_more: bool | None = None
+
+
+class Status20(Enum):
+    draft = "draft"
+    ready = "ready"
+    published = "published"
+    archived = "archived"
+
+
+class DataProduct(BaseModel):
+    id: UUID | None = None
+    name: str | None = None
+    description: str | None = None
+    schema_id: UUID | None = None
+    run_id: UUID | None = None
+    status: Status20 | None = None
+    created_at: AwareDatetime | None = None
+    updated_at: AwareDatetime | None = None
+
+
+class DataPolicy(BaseModel):
+    id: UUID | None = None
+    name: str | None = None
+    description: str | None = None
+    status: str | None = None
+    created_at: AwareDatetime | None = None
+    updated_at: AwareDatetime | None = None
+
+
+class DataPolicyField(BaseModel):
+    id: UUID | None = None
+    field_key: str | None = None
+    field_type: str | None = None
+    source: str | None = None
+    created_at: AwareDatetime | None = None
+
+
+class DataPolicyRule(BaseModel):
+    id: UUID | None = None
+    field_key: str | None = None
+    rule_type: str | None = None
+    config: dict[str, Any] | None = None
+    ordinal: int | None = None
+    created_at: AwareDatetime | None = None
+
+
+class NodeType(Enum):
+    transfer = "transfer"
+    extraction = "extraction"
+    resolution = "resolution"
+    validation = "validation"
+    assembly = "assembly"
+
+
+class Status21(Enum):
+    queued = "queued"
+    running = "running"
+    completed = "completed"
+    partial = "partial"
+    error = "error"
+
+
+class NodeRun(BaseModel):
+    """
+    A standalone run of one One Engine phase over a record set.
+    """
+
+    id: UUID | None = None
+    node_type: NodeType | None = None
+    status: Status21 | None = None
+    record_set_id: UUID | None = None
+    product_record_set_id: UUID | None = None
+    total: int | None = None
+    completed: int | None = None
+    errors: int | None = None
+    error_message: str | None = None
+    created_at: AwareDatetime | None = None
+    links: dict[str, Any] | None = None
+
+
+class Layer(Enum):
+    capture = "capture"
+    structured = "structured"
+    resolved = "resolved"
+    product = "product"
+
+
+class Links37(BaseModel):
+    self: str | None = None
+    fields: str | None = None
+    records: str | None = None
+    export: str | None = None
+
+
+class RecordSet(BaseModel):
+    id: UUID | None = None
+    name: str | None = None
+    layer: Layer | None = None
+    kind: str | None = None
+    """
+    Source kind (e.g. structuring_run, resolution_run, data_product).
+    """
+    source_id: UUID | None = None
+    """
+    Owning run/product ID where applicable.
+    """
+    status: str | None = None
+    """
+    Lifecycle state (e.g. active).
+    """
+    record_count: int | None = None
+    field_count: int | None = None
+    created_at: AwareDatetime | None = None
+    links: Links37 | None = None
 
 
 class ExtractSyncResponse(BaseModel):
     extraction_id: UUID = Field(..., examples=["d1a2b3c4-5678-9abc-def0-1234567890ab"])
     request_id: str = Field(..., examples=["req_x7y8z9a0b1c2d3e4"])
-    status: Status = Field(..., examples=["complete"])
+    status: Status1 = Field(..., examples=["complete"])
     document: ExtractDocumentSummary
     data: dict[str, Any] = Field(
         ...,
