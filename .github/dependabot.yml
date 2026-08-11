@@ -2,10 +2,29 @@ version: 2
 updates:
   - package-ecosystem: pip
     directory: "/"
-    schedule: { interval: weekly }
+    schedule:
+      interval: monthly
+    groups:
+      security-fixes:
+        applies-to: security-updates
+        patterns: ["*"]
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+        patterns: ["*"]
   - package-ecosystem: npm
     directory: "/"
-    schedule: { interval: weekly }
+    schedule:
+      interval: monthly
+    groups:
+      security-fixes:
+        applies-to: security-updates
+        patterns: ["*"]
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: "/"
-    schedule: { interval: weekly }
+    schedule:
+      interval: monthly
